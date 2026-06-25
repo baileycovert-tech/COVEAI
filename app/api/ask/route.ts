@@ -15,10 +15,10 @@ function localInventorySearch(query: string) {
   const STOP = new Set("the a an is are of for me my our we in on at to with what color stock vin trim price cheapest best aged new car truck trucks suv suvs sedan sedans coupe van minivan vehicle vehicles show find me any all and or under over have got".split(" "));
   const terms = (query.toLowerCase().match(/[a-z0-9-]+/g) || []).filter((t) => t.length > 1 && !STOP.has(t));
   const hit = units.filter((u) => {
-    const hay = `${u.stock} ${u.vin} ${u.year} ${u.model} ${u.trim} ${u.ext} ${u.int} ${u.store} ${u.status}`.toLowerCase();
+    const hay = `${u.stock} ${u.vin} ${u.year} ${u.make || ""} ${u.model} ${u.trim} ${u.ext} ${u.int} ${u.store} ${u.condition || ""} ${u.status}`.toLowerCase();
     return terms.every((t) => hay.includes(t) || (t.endsWith("s") && hay.includes(t.slice(0, -1))));
   });
-  return hit.slice(0, 25).map((u) => ({ stock: u.stock, vin: u.vin, vehicle: `${u.year} ${u.model} ${u.trim}`.trim(), color: u.ext, interior: u.int, price: u.price, age_days: u.age, status: u.status, store: u.store }));
+  return hit.slice(0, 25).map((u) => ({ stock: u.stock, vin: u.vin, vehicle: `${u.year} ${u.store === "Used" && u.make ? u.make + " " : ""}${u.model} ${u.trim || ""}`.replace(/\s+/g, " ").trim(), color: u.ext && !/^nan$/i.test(u.ext) ? u.ext : "", interior: u.int, price: u.price, mileage: u.mileage, age_days: u.age, status: u.status, store: u.store }));
 }
 
 function crmSnapshot() {
@@ -108,7 +108,7 @@ async function routedLookup(question: string): Promise<string | null> {
   try {
     // FOLLOW-UPS — open leads gone quiet.
     if (/\b(follow.?up|who.*(call|reach|contact|work)|need.*call|chase|stale|cold|left to)\b/.test(ql)) {
-      const rows = await dmsQuery(`SELECT customer, make, model, lead_status, COALESCE(last_customer_contact::text, lead_origination_date::text) AS last FROM scorecard_leads WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0 AND ${OPEN} AND (last_customer_contact IS NULL OR last_customer_contact < (NOW() - INTERVAL '4 days')) ORDER BY COALESCE(last_customer_contact, lead_origination_date) ASC LIMIT 12`);
+      const rows = await dmsQuery(`SELECT customer, year, make, model, lead_status, COALESCE(last_customer_contact::text, lead_origination_date::text) AS last FROM scorecard_leads WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0 AND lead_status IN ('Active Lead','New Lead','Waiting for prospect response') AND lead_origination_date >= (CURRENT_DATE - INTERVAL '60 days') AND (last_customer_contact IS NULL OR last_customer_contact < (NOW() - INTERVAL '3 days')) ORDER BY COALESCE(last_customer_contact, lead_origination_date) ASC LIMIT 12`);
       if (!rows.length) return "No open leads have gone quiet — you're caught up.";
       return `Follow up with these (quietest first):\n` + rows.map((r: any) => `• ${r.customer} — ${[r.year, r.make, r.model].filter(Boolean).join(" ") || "vehicle TBD"} · last touch ${(r.last || "never").slice(0, 10)} · ${r.lead_status}`).join("\n");
     }
