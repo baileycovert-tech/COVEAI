@@ -81,17 +81,22 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
     freshMin: number,
     oldMin: number,
     asOf: string | null,
-    detail: string
+    detail: string,
+    // Optional: grade status by the data's own marker date (e.g. a wiki last_refresh)
+    // instead of the file's write time, so re-saving stale data can't look fresh.
+    statusMarker?: string | null
   ): HealthRow => {
     const mt = statMs(file);
     const ageMs = mt == null ? null : now - mt;
+    const markerMs = statusMarker ? Date.parse(statusMarker) : NaN;
+    const statusAgeMs = Number.isNaN(markerMs) ? ageMs : now - markerMs;
     return {
       key,
       label,
       upstream,
       refresh,
       file,
-      status: statusFor(ageMs, freshMin, oldMin),
+      status: statusFor(statusAgeMs, freshMin, oldMin),
       lastWritten: fmtLocal(mt),
       ageLabel: ageLabel(ageMs),
       asOf,
@@ -206,7 +211,8 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
       1440,
       4320,
       pipeline.last_refresh || null,
-      `${pipeLeads} leads in pipeline`
+      `${pipeLeads} leads in pipeline`,
+      pipeline.last_refresh || null
     ),
     row(
       "customers",
@@ -228,7 +234,8 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
       20160, // 14 days fresh — this is a deliberately periodic source
       86400, // 60 days
       lb.asOf || null,
-      `${(lb.rows || []).length} ranked${lb.asOf ? ` · asOf ${lb.asOf}` : ""}`
+      `${(lb.rows || []).length} ranked${lb.asOf ? ` · asOf ${lb.asOf}` : ""}`,
+      lb.asOf || null
     ),
     row(
       "send-log",
