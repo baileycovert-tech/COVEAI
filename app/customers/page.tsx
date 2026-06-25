@@ -23,7 +23,7 @@ export default function CustomersPage() {
             <div className="row-sub" style={{ maxWidth: 260 }}>{c.vehicle_interest || "—"}</div>
           </div>
         </div>
-        {c.hot && <span className="badge hot">🔥 Hot</span>}
+        {c.hot && <span className="badge hot">Hot</span>}
       </div>
       <div className="lead-note" style={{ marginTop: 10 }}>{c.notes || c.next_step}</div>
       <div className="flex between mt-sm" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>
@@ -42,7 +42,7 @@ export default function CustomersPage() {
 
       {hot.length > 0 && (
         <>
-          <div className="nav-label" style={{ margin: "4px 0 10px" }}>🔥 Hot</div>
+          <div className="nav-label" style={{ margin: "4px 0 10px" }}>Hot</div>
           <div className="grid cols-3">{hot.map((c) => <Card key={c.slug} c={c} />)}</div>
         </>
       )}

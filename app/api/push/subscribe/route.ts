@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!subscription?.endpoint) return NextResponse.json({ error: "Bad subscription" }, { status: 400 });
   saveSub(session.slug, subscription);
   if (test) {
-    await pushToSlug(session.slug, { title: "Covert CRM ✅", body: "Notifications are on — you'll get new leads here.", url: "/" });
+    await pushToSlug(session.slug, { title: "Covert CRM", body: "Notifications are on — you'll get new leads here.", url: "/" });
   }
   return NextResponse.json({ ok: true });
 }

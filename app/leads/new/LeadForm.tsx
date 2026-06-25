@@ -55,11 +55,11 @@ export default function LeadForm({ isAdmin, repFirst }: { isAdmin: boolean; repF
 
           {isAdmin && (
             <div className="card mt" style={{ background: "rgba(59,130,246,.08)", borderColor: "rgba(59,130,246,.3)" }}>
-              <label className="stat-label" style={{ marginBottom: 8 }}>✉️ Auto first-touch to the customer</label>
+              <label className="stat-label" style={{ marginBottom: 8 }}>Auto first-touch to the customer</label>
               <div className="flex gap-sm wrap">
                 <button type="button" className={"btn sm" + (touch === "none" ? " primary" : "")} onClick={() => setTouch("none")}>Don't send</button>
-                <button type="button" className={"btn sm" + (touch === "text" ? " primary" : "")} onClick={() => setTouch("text")}>💬 Text now</button>
-                <button type="button" className={"btn sm" + (touch === "email" ? " primary" : "")} onClick={() => setTouch("email")}>✉️ Email now</button>
+                <button type="button" className={"btn sm" + (touch === "text" ? " primary" : "")} onClick={() => setTouch("text")}>Text now</button>
+                <button type="button" className={"btn sm" + (touch === "email" ? " primary" : "")} onClick={() => setTouch("email")}>Email now</button>
               </div>
               {touch !== "none" && <div className="stat-sub mt-sm">Sends a friendly first-touch in your voice the instant you save — to the {touch === "email" ? "email" : "phone"} above.</div>}
             </div>
@@ -71,21 +71,21 @@ export default function LeadForm({ isAdmin, repFirst }: { isAdmin: boolean; repF
         </form>
 
         <div>
-          {result?.error && <div className="callout" style={{ borderColor: "rgba(248,113,113,.4)", background: "rgba(248,113,113,.08)" }}>⚠️ {result.error}</div>}
+          {result?.error && <div className="callout" style={{ borderColor: "rgba(248,113,113,.4)", background: "rgba(248,113,113,.08)" }}>{result.error}</div>}
           {result?.ok && (
             <div className="card pad-lg">
-              <div className="card-title" style={{ marginBottom: 10 }}>✅ Lead saved</div>
+              <div className="card-title" style={{ marginBottom: 10 }}>Lead saved</div>
               <div className="lead-note" style={{ fontSize: 13, lineHeight: 1.6 }}>
-                It's on your board now. 🚗 Inventory match: <strong>{result.match}</strong>.
-                {result.firstTouch?.ok && <><br /><br />✉️ First-touch <strong>sent</strong> to the customer via {result.firstTouch.channel}.</>}
-                {result.firstTouch && !result.firstTouch.ok && <><br /><br />⚠️ First-touch not sent: {result.firstTouch.error}</>}
+                It's on your board now. Inventory match: <strong>{result.match}</strong>.
+                {result.firstTouch?.ok && <><br /><br />First-touch <strong>sent</strong> to the customer via {result.firstTouch.channel}.</>}
+                {result.firstTouch && !result.firstTouch.ok && <><br /><br />First-touch not sent: {result.firstTouch.error}</>}
               </div>
-              <a className="btn mt" href="/">← Back to board</a>
+              <a className="btn mt" href="/">Back to board</a>
             </div>
           )}
           {!result && (
             <div className="card pad-lg">
-              <div className="card-title" style={{ marginBottom: 10 }}>💡 Tip</div>
+              <div className="card-title" style={{ marginBottom: 10 }}>Tip</div>
               <div className="lead-note" style={{ fontSize: 13, lineHeight: 1.6 }}>
                 Add the vehicle of interest and the system instantly tells you what's in stock that fits — and flags aged units with the most deal room. {isAdmin ? "Flip on auto first-touch to greet the customer the second you log them." : ""}
               </div>

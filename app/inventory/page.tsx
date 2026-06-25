@@ -1,5 +1,6 @@
 import { getInventory, money } from "../lib/data";
 import { PageHead, LivePill, StatCard } from "../components/ui";
+import { Car, DollarSign, Clock, Package, Target } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ function Table({ title, rows, tone }: { title: string; rows: Row[]; tone: "ford"
               <td className="num">{r.avgDays}</td>
               <td className="num">
                 {r.avgDays >= 120
-                  ? <span className="badge aged">🐢 Aged</span>
+                  ? <span className="badge aged">Aged</span>
                   : r.avgDays <= 30
                   ? <span className="badge green">Fresh</span>
                   : null}
@@ -60,16 +61,16 @@ export default function InventoryPage() {
       />
 
       <div className="grid cols-4">
-        <StatCard ico="🚙" label="New units in stock" value={String(totalUnits)} sub={`${ford.reduce((n, r) => n + r.units, 0)} Ford · ${chevy.reduce((n, r) => n + r.units, 0)} Chevy`} />
-        <StatCard ico="💵" label="Inventory value" value={money(totalValue)} sub="At average MSRP" />
-        <StatCard ico="🐢" label="Aged lines (120+ days)" value={String(aged.length)} sub="Spiff / move-it candidates" />
-        <StatCard ico="📦" label="Deepest line" value={[...all].sort((a, b) => b.units - a.units)[0]?.model || "—"} sub={`${[...all].sort((a, b) => b.units - a.units)[0]?.units || 0} in stock`} />
+        <StatCard ico={<Car />} label="New units in stock" value={String(totalUnits)} sub={`${ford.reduce((n, r) => n + r.units, 0)} Ford · ${chevy.reduce((n, r) => n + r.units, 0)} Chevy`} />
+        <StatCard ico={<DollarSign />} label="Inventory value" value={money(totalValue)} sub="At average MSRP" />
+        <StatCard ico={<Clock />} label="Aged lines (120+ days)" value={String(aged.length)} sub="Spiff / move-it candidates" />
+        <StatCard ico={<Package />} label="Deepest line" value={[...all].sort((a, b) => b.units - a.units)[0]?.model || "—"} sub={`${[...all].sort((a, b) => b.units - a.units)[0]?.units || 0} in stock`} />
       </div>
 
       {aged.length > 0 && (
         <div className="card section-gap">
           <div className="callout">
-            <span className="ico">🎯</span>
+            <span className="ico"><Target /></span>
             <strong>Aged-unit play:</strong> {aged.slice(0, 4).map((r) => `${r.model} (${r.avgDays}d avg)`).join(", ")} are sitting longest. These usually carry the most dealer markdown/spiff — lead with them when a customer is flexible on trim, and pitch the floor-plan savings to your manager to win the discount.
           </div>
         </div>

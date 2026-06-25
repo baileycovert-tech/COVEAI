@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "../lib/auth";
 import { getDataHealth, getConnections, type SourceStatus } from "../lib/health";
 import { PageHead } from "../components/ui";
+import { CheckCircle2, Moon, AlertTriangle, Radio, Plug, Lightbulb } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +42,11 @@ export default function HealthPage() {
   const allStale = liveSources.every((r) => r.status !== "live");
 
   // Honest top banner — reflects the actual state of the refresh pipeline.
-  let banner: { cls: string; ico: string; text: React.ReactNode };
+  let banner: { cls: string; ico: React.ReactNode; text: React.ReactNode };
   if (nProblem === 0 && nLive > 0 && !allStale) {
     banner = {
       cls: "callout",
-      ico: "✅",
+      ico: <CheckCircle2 />,
       text: (
         <>
           <strong>Sources are refreshing.</strong> {nLive} of {liveSources.length} feeds updated within their
@@ -56,7 +57,7 @@ export default function HealthPage() {
   } else if (allStale) {
     banner = {
       cls: "callout bad",
-      ico: "🌙",
+      ico: <Moon />,
       text: (
         <>
           <strong>Nothing has refreshed recently.</strong> Every live feed below is past its refresh window —
@@ -70,7 +71,7 @@ export default function HealthPage() {
   } else {
     banner = {
       cls: "callout warn",
-      ico: "⚠️",
+      ico: <AlertTriangle />,
       text: (
         <>
           <strong>Partial freshness.</strong> {nLive} live, {nProblem} stale/stopped. Each row shows when it
@@ -100,7 +101,7 @@ export default function HealthPage() {
       </div>
 
       <div className="card pad-lg">
-        <div className="card-title" style={{ marginBottom: 10 }}>📡 Data sources</div>
+        <div className="card-title" style={{ marginBottom: 10 }}><span className="ico"><Radio /></span>Data sources</div>
         <table>
           <thead>
             <tr>
@@ -145,7 +146,7 @@ export default function HealthPage() {
       </div>
 
       <div className="card pad-lg section-gap">
-        <div className="card-title" style={{ marginBottom: 10 }}>🔌 Send &amp; integration bridges</div>
+        <div className="card-title" style={{ marginBottom: 10 }}><span className="ico"><Plug /></span>Send &amp; integration bridges</div>
         <table>
           <thead>
             <tr>
@@ -176,7 +177,7 @@ export default function HealthPage() {
 
       <div className="card section-gap">
         <div className="callout">
-          <span className="ico">💡</span>
+          <span className="ico"><Lightbulb /></span>
           <strong>How “live” works here:</strong> the dealership DB and the Drive log are reachable only by
           Claude (via MCP), not by this web app directly. Claude’s scheduled tasks pull them on a timer and
           write the JSON this app reads. So “live” means “a refresh task ran recently” — this page is how you

@@ -47,7 +47,7 @@ export default function LoginForm({ roster, next }: { roster: { slug: string; na
           {roster.map((r) => <option key={r.slug} value={r.name} />)}
         </datalist>
 
-        {err && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 12 }}>⚠️ {err}</div>}
+        {err && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 12 }}>{err}</div>}
 
         <button className="btn primary mt" style={{ width: "100%", justifyContent: "center" }} disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}

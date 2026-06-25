@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getPipeline } from "../lib/data";
 import { currentUser } from "../lib/auth";
 import { PageHead, LivePill } from "../components/ui";
+import { Phone } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default function PipelinePage() {
                 {l.vehicle && <div className="lead-veh">{l.vehicle}</div>}
                 {l.note && <div className="lead-note">{l.note}</div>}
                 {l.phone && (
-                  <div className="lead-meta"><span>📞 {l.phone}</span></div>
+                  <div className="lead-meta"><span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Phone size={12} /> {l.phone}</span></div>
                 )}
               </div>
             ))}

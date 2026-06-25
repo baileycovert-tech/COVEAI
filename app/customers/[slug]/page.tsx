@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCustomers, matchInventory, money } from "../../lib/data";
 import { currentUser } from "../../lib/auth";
 import { PageHead, Avatar } from "../../components/ui";
+import { Handshake, Car } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,8 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
         sub={c.vehicle_interest || "Customer record"}
         right={
           <div className="flex gap-sm">
-            <Link className="btn" href="/customers">← All customers</Link>
-            <Link className="btn primary" href={`/outreach?slug=${c.slug}`}>✨ Draft AI message</Link>
+            <Link className="btn" href="/customers">All customers</Link>
+            <Link className="btn primary" href={`/outreach?slug=${c.slug}`}>Draft AI message</Link>
           </div>
         }
       />
@@ -33,7 +34,7 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
               <div className="row-title" style={{ fontSize: 16 }}>{c.name}</div>
               <div className="row-sub">{c.stage}{c.source ? ` · ${c.source}` : ""}</div>
             </div>
-            {c.hot && <span className="badge hot" style={{ marginLeft: "auto" }}>🔥 Hot</span>}
+            {c.hot && <span className="badge hot" style={{ marginLeft: "auto" }}>Hot</span>}
           </div>
 
           <dl className="kv">
@@ -49,17 +50,17 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card">
-            <div className="card-title" style={{ marginBottom: 10 }}>📝 Summary</div>
+            <div className="card-title" style={{ marginBottom: 10 }}>Summary</div>
             <div className="lead-note" style={{ fontSize: 13, lineHeight: 1.6 }}>{c.notes || "No summary yet."}</div>
           </div>
           {c.personal && (
             <div className="card">
-              <div className="card-title" style={{ marginBottom: 10 }}>🤝 Rapport</div>
+              <div className="card-title" style={{ marginBottom: 10 }}><span className="ico"><Handshake /></span>Rapport</div>
               <div className="lead-note" style={{ fontSize: 13, lineHeight: 1.6 }}>{c.personal}</div>
             </div>
           )}
           <div className="card">
-            <div className="card-title" style={{ marginBottom: 10 }}>🚗 In stock that fits</div>
+            <div className="card-title" style={{ marginBottom: 10 }}><span className="ico"><Car /></span>In stock that fits</div>
             {matches.length === 0 ? (
               <div className="lead-note" style={{ fontSize: 13 }}>No direct model match in current stock — check <a className="card-link" href="/inventory">full inventory</a> or a dealer-trade.</div>
             ) : (
@@ -68,7 +69,7 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
                   <span className={"badge " + m.store.toLowerCase()}>{m.store}</span>
                   <div className="row-main">
                     <div className="row-title" style={{ fontSize: 13 }}>{m.model}</div>
-                    <div className="row-sub">{m.units} in stock · avg {money(m.avgMsrp)}{m.avgDays >= 120 ? " · 🐢 aged (deal room)" : ""}</div>
+                    <div className="row-sub">{m.units} in stock · avg {money(m.avgMsrp)}{m.avgDays >= 120 ? " · aged (deal room)" : ""}</div>
                   </div>
                 </div>
               ))

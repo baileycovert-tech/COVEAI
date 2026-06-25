@@ -113,12 +113,12 @@ export default function OutreachClient({
       <div className="grid cols-2">
         {/* Composer */}
         <div className="card pad-lg">
-          <div className="card-title" style={{ marginBottom: 14 }}>✨ New draft</div>
+          <div className="card-title" style={{ marginBottom: 14 }}>New draft</div>
 
           <label className="stat-label">Customer</label>
           <select className="field mt-sm" value={slug} onChange={(e) => setSlug(e.target.value)}>
             {customers.map((c) => (
-              <option key={c.slug} value={c.slug}>{c.hot ? "🔥 " : ""}{c.name}{c.vehicle ? ` — ${c.vehicle}` : ""}</option>
+              <option key={c.slug} value={c.slug}>{c.hot ? "" : ""}{c.name}{c.vehicle ? ` — ${c.vehicle}` : ""}</option>
             ))}
           </select>
 
@@ -131,15 +131,15 @@ export default function OutreachClient({
           <label className="stat-label mt">Channel</label>
           <div className="flex gap-sm mt-sm">
             <button className={"btn sm" + (channel === "text" ? " primary" : "")} onClick={() => setChannel("text")}>
-              💬 Text {!canText && <span style={{ opacity: 0.6 }}>(no #)</span>}
+              Text {!canText && <span style={{ opacity: 0.6 }}>(no #)</span>}
             </button>
             <button className={"btn sm" + (channel === "email" ? " primary" : "")} onClick={() => setChannel("email")}>
-              ✉️ Email {!canEmail && <span style={{ opacity: 0.6 }}>(no email)</span>}
+              Email {!canEmail && <span style={{ opacity: 0.6 }}>(no email)</span>}
             </button>
           </div>
           {((channel === "text" && !canText) || (channel === "email" && !canEmail)) && (
             <div className="stat-sub" style={{ color: "var(--amber)", marginTop: 8 }}>
-              ⚠️ No {channel === "text" ? "phone number" : "email"} on file for {selected?.name}. You can still draft, but it can't be sent until you add one to the customer record.
+              No {channel === "text" ? "phone number" : "email"} on file for {selected?.name}. You can still draft, but it can't be sent until you add one to the customer record.
             </div>
           )}
 
@@ -151,13 +151,13 @@ export default function OutreachClient({
           />
 
           <button className="btn primary mt" style={{ width: "100%", justifyContent: "center" }} onClick={generate} disabled={busy || !slug}>
-            {busy ? "Drafting…" : aiEnabled ? "✨ Generate with Claude" : "Generate draft"}
+            {busy ? "Drafting…" : aiEnabled ? "Generate with Claude" : "Generate draft"}
           </button>
         </div>
 
         {/* Counts */}
         <div className="card pad-lg">
-          <div className="card-title" style={{ marginBottom: 14 }}>📬 Queue</div>
+          <div className="card-title" style={{ marginBottom: 14 }}>Queue</div>
           <div className="grid cols-3" style={{ gap: 10 }}>
             <div className="card" style={{ textAlign: "center" }}>
               <div className="stat-value" style={{ fontSize: 26 }}>{pending.length}</div>
@@ -173,13 +173,13 @@ export default function OutreachClient({
             </div>
           </div>
           <div className="stat-sub mt">
-            Approve a draft, then hit <strong>📤 Send now</strong> — texts go out as a real iMessage and emails send from your Gmail, straight to the customer. Nothing sends until you approve and click.
+            Approve a draft, then hit <strong>Send now</strong> — texts go out as a real iMessage and emails send from your Gmail, straight to the customer. Nothing sends until you approve and click.
           </div>
         </div>
       </div>
 
       {/* Drafts to review */}
-      <div className="nav-label" style={{ margin: "24px 0 10px" }}>📝 To review ({pending.length})</div>
+      <div className="nav-label" style={{ margin: "24px 0 10px" }}>To review ({pending.length})</div>
       {pending.length === 0 && <div className="card"><div className="empty">No drafts waiting. Generate one above.</div></div>}
       <div className="grid cols-2">
         {pending.map((d) => (
@@ -191,7 +191,7 @@ export default function OutreachClient({
 
       {approved.length > 0 && (
         <>
-          <div className="nav-label" style={{ margin: "24px 0 10px" }}>✅ Approved — ready to send ({approved.length})</div>
+          <div className="nav-label" style={{ margin: "24px 0 10px" }}>Approved — ready to send ({approved.length})</div>
           <div className="grid cols-2">
             {approved.map((d) => {
               const c = custBySlug(d.slug);
@@ -209,7 +209,7 @@ export default function OutreachClient({
 
       {sent.length > 0 && (
         <>
-          <div className="nav-label" style={{ margin: "24px 0 10px" }}>📤 Sent ({sent.length})</div>
+          <div className="nav-label" style={{ margin: "24px 0 10px" }}>Sent ({sent.length})</div>
           <div className="grid cols-2">
             {sent.map((d) => (
               <div className="card" key={d.id} style={{ opacity: 0.7 }}>
@@ -244,12 +244,12 @@ function DraftCard({
       <div className="flex between">
         <div className="flex gap-sm">
           <strong>{d.customer}</strong>
-          <span className="badge">{d.channel === "email" ? "✉️ Email" : "💬 Text"}</span>
+          <span className="badge">{d.channel === "email" ? "Email" : "Text"}</span>
           <span className={"badge " + (d.generatedBy === "ai" ? "new" : "amber")}>{d.generatedBy === "ai" ? "Claude" : "Template"}</span>
         </div>
         {approvedView && <span className="badge green">Approved</span>}
       </div>
-      {d.rationale && <div className="stat-sub" style={{ marginTop: 8 }}>🎯 {d.rationale}</div>}
+      {d.rationale && <div className="stat-sub" style={{ marginTop: 8 }}>{d.rationale}</div>}
 
       {edit ? (
         <div className="mt-sm">
@@ -267,21 +267,21 @@ function DraftCard({
       )}
 
       <div className="flex gap-sm wrap mt">
-        <button className="btn sm" onClick={onCopy}>{copied ? "✓ Copied" : "📋 Copy"}</button>
-        {!edit && <button className="btn sm ghost" onClick={() => setEdit(true)}>✏️ Edit</button>}
+        <button className="btn sm" onClick={onCopy}>{copied ? "✓ Copied" : "Copy"}</button>
+        {!edit && <button className="btn sm ghost" onClick={() => setEdit(true)}>Edit</button>}
         {onApprove && !edit && <button className="btn green sm" onClick={onApprove}>✓ Approve</button>}
         {onSend && (
           <button className="btn green sm" onClick={onSend} disabled={sending || !canSend}
             title={!canSend ? "No contact info on file for this channel" : `Send the ${d.channel} now`}>
-            {sending ? "Sending…" : d.channel === "email" ? "📤 Send email now" : "📤 Send text now"}
+            {sending ? "Sending…" : d.channel === "email" ? "Send email now" : "Send text now"}
           </button>
         )}
         <button className="btn sm ghost" style={{ marginLeft: "auto", color: "var(--red)" }} onClick={onDismiss}>Dismiss</button>
       </div>
-      {error && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 10 }}>⚠️ {error}</div>}
+      {error && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 10 }}>{error}</div>}
       {approvedView && !canSend && !error && (
         <div className="stat-sub" style={{ color: "var(--amber)", marginTop: 10 }}>
-          ⚠️ No {d.channel === "email" ? "email" : "phone number"} on file — add one to the customer record to enable sending.
+          No {d.channel === "email" ? "email" : "phone number"} on file — add one to the customer record to enable sending.
         </div>
       )}
     </div>
