@@ -36,7 +36,7 @@ export default function AskWidget() {
     try {
       const r = await fetch("/api/settings/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k }) });
       const d = await r.json();
-      if (d.ok) { setHasKey(true); setKeyInput(""); setMsgs((m) => [...m, { role: "bot", text: "Full assistant unlocked. Ask me anything — I'll query the live database, work your pipeline, and draft in your voice.", source: "ai" }]); }
+      if (d.ok) { setHasKey(true); setKeyInput(""); setMsgs((m) => [...m, { role: "bot", text: "COVE is fully online. Ask me anything — I'll query the live database, work your pipeline, and draft in your voice.", source: "ai" }]); }
       else setKeyErr(d.error || "Could not save the key.");
     } catch { setKeyErr("Could not save the key."); }
     finally { setSavingKey(false); }
@@ -62,8 +62,8 @@ export default function AskWidget() {
 
   if (!open) {
     return (
-      <button className="ask-fab" onClick={() => setOpen(true)} aria-label="Ask the CRM">
-        <MessageSquare size={20} /> Ask
+      <button className="ask-fab" onClick={() => setOpen(true)} aria-label="Ask COVE">
+        <Sparkles size={18} /> COVE
       </button>
     );
   }
@@ -73,7 +73,10 @@ export default function AskWidget() {
       <div className="ask-head">
         <div className="flex" style={{ gap: 8 }}>
           <span style={{ display: "inline-flex", color: "hsl(var(--primary))" }}><Sparkles size={16} /></span>
-          <strong style={{ fontSize: 14 }}>Ask the CRM</strong>
+          <div style={{ lineHeight: 1.1 }}>
+            <strong style={{ fontSize: 14 }}>COVE</strong>
+            <div className="ask-src" style={{ marginTop: 0 }}>your AI sales assistant</div>
+          </div>
           {hasKey && <span className="badge green" style={{ fontSize: 10 }}><Check size={11} /> Full</span>}
         </div>
         <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => setOpen(false)} aria-label="Close"><X size={15} /></button>
@@ -97,7 +100,7 @@ export default function AskWidget() {
 
         {msgs.length === 0 && (
           <div>
-            <div className="ask-hint">Ask about your pipeline, a deal, a stock #/VIN, inventory, or “draft a text to …”. Answers come straight from your live data.</div>
+            <div className="ask-hint">I'm <strong>COVE</strong> — ask about your pipeline, a deal, a stock #/VIN, inventory, or “draft a text to …”. Answers come straight from your live data.</div>
             <div className="flex wrap" style={{ gap: 6, marginTop: 10 }}>
               {SUGGESTIONS.map((s) => (
                 <button key={s} className="pill" style={{ cursor: "pointer", fontSize: 11 }} onClick={() => ask(s)}>{s}</button>
