@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getCustomers, matchInventory, money } from "../../lib/data";
+import { getCustomers, getThreadForCustomer, matchInventory, money } from "../../lib/data";
 import { currentUser } from "../../lib/auth";
 import { PageHead, Avatar } from "../../components/ui";
-import { Handshake, Car } from "lucide-react";
+import { Handshake, Car, MessageSquare } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,7 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
   const c = getCustomers().find((x) => x.slug === params.slug);
   if (!c) return notFound();
   const matches = matchInventory(c.vehicle_interest);
+  const thread = getThreadForCustomer(c);
 
   return (
     <>
@@ -77,6 +78,20 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
           </div>
         </div>
       </div>
+
+      {thread.length > 0 && (
+        <div className="card pad-lg section-gap">
+          <div className="card-title" style={{ marginBottom: 12 }}><span className="ico"><MessageSquare /></span>Message log <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— {thread.length} from iMessage</span></div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {thread.map((m, i) => (
+              <div key={i} className={"ask-msg " + (m.dir === "out" ? "you" : "bot")} style={{ maxWidth: "80%", alignSelf: m.dir === "out" ? "flex-end" : "flex-start" }}>
+                <div>{m.text}</div>
+                <div className="ask-src">{(m.at || "").replace("T", " ").slice(0, 16)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

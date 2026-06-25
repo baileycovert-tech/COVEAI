@@ -1,14 +1,28 @@
 import {
   currentMonthBoard, getMetrics, getDeals, getPipeline,
-  getCustomers, getProfile, getSignals, getReps, getLeadFeed, redactPhones, monthTotals, money,
+  getCustomers, getProfile, getSignals, getReps, getLeadFeed, getTextLeads, getImsgStatus, redactPhones, monthTotals, money,
 } from "./lib/data";
 import { boardFreshness } from "./lib/health";
 import { currentUser } from "./lib/auth";
 import { PageHead, FreshPill, StatCard, UnitsChart, Avatar } from "./components/ui";
 import {
   Bell, Car, DollarSign, ClipboardList, Trophy, Radio, BarChart3,
-  Flame, ReceiptText, Lightbulb, Megaphone, CarFront,
+  Flame, ReceiptText, Lightbulb, Megaphone, CarFront, MessageSquare,
 } from "lucide-react";
+
+function TextLeadBanner() {
+  const status = getImsgStatus();
+  const textLeads = getTextLeads();
+  if (!textLeads.length) return null;
+  const newest = textLeads.slice(0, 3).map((l) => l.name).join(", ");
+  return (
+    <a href="/pipeline" className="callout" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, textDecoration: "none" }}>
+      <span className="ico" style={{ color: "hsl(var(--primary))" }}><MessageSquare size={16} /></span>
+      <span><strong>{textLeads.length} lead{textLeads.length === 1 ? "" : "s"} from texts</strong> in your pipeline{newest ? ` — ${newest}${textLeads.length > 3 ? "…" : ""}` : ""}.
+        {status?.followups ? ` ${status.followups} follow-up${status.followups === 1 ? "" : "s"} logged.` : ""} <span className="card-link">Open pipeline →</span></span>
+    </a>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +157,7 @@ export default function Dashboard() {
         sub={`Month-to-date — ${profile.currentMonthLabel || board.label} · data through ${(profile.dataThrough || "").slice(5) || "today"}`}
         right={<FreshPill {...boardFreshness()} />}
       />
+      <TextLeadBanner />
       <NewLeads leads={myLeads} />
       <div className="grid cols-4">
         <StatCard ico={<Car />} label="Units MTD" value={String(board.units)}

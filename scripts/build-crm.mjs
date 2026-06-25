@@ -114,6 +114,26 @@ for (const wc of wikiFull) {
   customers.push({ ...wc, _stage: isHot ? "hot" : "working" });
 }
 
+// Union in iMessage text-leads (from imessage-ingest) — these can NEVER be dropped.
+// They land in "needs first contact" and carry their texted vehicle interest.
+const textLeads = read("imessage-leads.json", []);
+for (const tl of textLeads) {
+  const key = normName(tl.name || "");
+  if (key && haveNames.has(key)) {
+    // already a known customer — just mark them hot from the fresh text
+    const c = customers.find((x) => normName(x.name) === key);
+    if (c) { c.hot = true; c._stage = "hot"; if (!c.phone && tl.phone) c.phone = tl.phone; }
+    continue;
+  }
+  if (key) haveNames.add(key);
+  customers.push({
+    slug: tl.slug, name: tl.name, phone: tl.phone || null, email: null,
+    vehicle_interest: tl.vehicle || "vehicle TBD", trade: null, stage: "New text lead",
+    status: "active", last_touch: dateOnly(tl.at), next_step: "Reply to their text — make first contact",
+    personal: "", source: tl.source || "iMessage", notes: tl.lastMsg || "", hot: true, _stage: "hot",
+  });
+}
+
 // ---- pipeline columns (same people, grouped by live stage) ----
 const COLS = [
   { key: "hot", title: "Needs first contact", stages: ["hot"] },

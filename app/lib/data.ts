@@ -73,6 +73,26 @@ export const getLeadFeed = (slug: string) => {
   return all[slug] || [];
 };
 
+// iMessage ingestion outputs
+export type TextLead = { slug: string; name: string; phone: string | null; vehicle: string; source: string; stock: string | null; at: string; lastMsg: string; hot: boolean; channel: string };
+export const getTextLeads = () => read<TextLead[]>("imessage-leads.json", []);
+export const getImsgStatus = () => read<any>("imessage-status.json", null);
+export type ThreadMsg = { at: string; text: string; dir: string };
+export const getThread = (slug: string) => {
+  const all = read<Record<string, ThreadMsg[]>>("imessage-threads.json", {});
+  return all[slug] || [];
+};
+// A text-lead's thread may be keyed by its imsg-slug even after it merges into an
+// existing customer record — match by slug, name, OR phone so it always links.
+export const getThreadForCustomer = (c: { slug: string; name?: string; phone?: string | null }) => {
+  const all = read<Record<string, ThreadMsg[]>>("imessage-threads.json", {});
+  const kb = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const p10 = (s: string) => (String(s || "").match(/\d/g) || []).join("").slice(-10);
+  const keys = [c.slug, "imsg-" + kb(c.name || ""), c.phone ? "imsg-" + p10(c.phone) : ""].filter(Boolean);
+  for (const k of keys) if (all[k]?.length) return all[k];
+  return [] as ThreadMsg[];
+};
+
 export type SoldDeal = {
   id: string; date: string; deal: number; customer: string; stock: string; vin: string;
   nuo: string; store: string; year: number | null; make: string | null; model: string | null;
