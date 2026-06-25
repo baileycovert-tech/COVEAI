@@ -272,6 +272,26 @@ export type Conn = { key: string; label: string; ok: boolean; detail: string };
 export function getConnections(): Conn[] {
   const out: Conn[] = [];
 
+  // Autonomous refresh engine — the launchd cron (com.covert.crm-refresh) that talks
+  // straight to the DMS MCP every 5 min. Its heartbeat proves "constant" is actually on.
+  const rt = statMs("_refresh-log.json");
+  const rlog = readJSON<any>("_refresh-log.json", null);
+  if (rt != null && rlog) {
+    const age = Date.now() - rt;
+    const fresh = age <= 12 * 60000; // a 5-min cron should heartbeat within ~12 min
+    const errs = Object.keys(rlog.errors || {});
+    out.push({
+      key: "refresh-engine",
+      label: "Live refresh engine (DMS, autonomous)",
+      ok: fresh && errs.length === 0,
+      detail: `last run ${ageLabel(age)} · leads ${rlog.ok?.leads ?? "?"}, inventory ${rlog.ok?.inventory ?? "?"} units` +
+        (errs.length ? ` · ERRORS: ${errs.join(", ")}` : "") +
+        (fresh ? "" : " · STALLED — check launchctl/com.covert.crm-refresh"),
+    });
+  } else {
+    out.push({ key: "refresh-engine", label: "Live refresh engine (DMS, autonomous)", ok: false, detail: "no heartbeat yet — is com.covert.crm-refresh loaded?" });
+  }
+
   // AI drafting (Anthropic) — on if a key is present, else template fallback.
   const hasKey = !!process.env.ANTHROPIC_API_KEY;
   out.push({
