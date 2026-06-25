@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
-import { getOutreachQueue, getCustomers, writeData } from "../../../lib/data";
+import { getOutreachQueue, getOutreachTargets, writeData } from "../../../lib/data";
+import { lookupContact } from "../../../lib/contacts";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +42,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Approve the draft before sending." }, { status: 400 });
   }
 
-  const customer = getCustomers().find((c) => c.slug === draft.slug);
-  const recipient = draft.channel === "email" ? customer?.email : customer?.phone;
+  // getOutreachTargets already enriches phone/email from the 35k contacts index.
+  const customer = getOutreachTargets().find((c) => c.slug === draft.slug);
+  let recipient = draft.channel === "email" ? customer?.email : customer?.phone;
+  // Last-ditch: look the contact up directly (covers a draft made before enrichment).
+  if (!recipient) {
+    const hit = lookupContact(customer?.name || draft.customer, customer?.phone);
+    recipient = draft.channel === "email" ? hit?.email : hit?.phone;
+  }
   if (!recipient) {
     return NextResponse.json(
-      { error: `No ${draft.channel === "email" ? "email address" : "phone number"} on file for ${draft.customer}. Add it to the customer record first.` },
+      { error: `No ${draft.channel === "email" ? "email address" : "phone number"} found for ${draft.customer} — not in the customer record or your contacts. Add it first.` },
       { status: 400 }
     );
   }

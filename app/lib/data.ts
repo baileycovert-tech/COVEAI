@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { lookupContact } from "./contacts";
 
 // Data lives in /data at the repo root and is read at request time so a sync
 // (or a hand edit) is reflected on the next page load — that's the "live" part.
@@ -142,8 +143,18 @@ export function getOutreachTargets(repSlug = "bailey-covert"): Customer[] {
       hot: !!l.urgent,
     });
   }
+  // Fill in any missing phone/email from Bailey's 35k contacts index (contacts.db).
+  const all = [...leadTargets, ...customers];
+  for (const c of all) {
+    if (c.phone && c.email) continue;
+    const hit = lookupContact(c.name, c.phone);
+    if (hit) {
+      if (!c.phone && hit.phone) c.phone = hit.phone;
+      if (!c.email && hit.email) c.email = hit.email;
+    }
+  }
   // Live leads first (freshest), then existing customers.
-  return [...leadTargets, ...customers];
+  return all;
 }
 
 export type RepBoard = { units: number; newU: number; usedU: number; gross: number };

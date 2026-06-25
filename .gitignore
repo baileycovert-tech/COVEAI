@@ -14,3 +14,5 @@ data/.session-secret
 data/*.json
 data/.lead-seen.json
 data/poll.db
+data/contacts.db
+data/contacts.db-*

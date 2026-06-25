@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getInventoryUnits, getDeals, getCustomers, getPipeline, getReps, getOutreachTargets, money } from "../../lib/data";
 import { dmsQuery } from "../../lib/dms";
 import { draftMessage } from "../../lib/anthropic";
+import { lookupContact } from "../../lib/contacts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,6 +67,11 @@ const TOOLS = [
     description: "Search the local snapshot of available new + used inventory (all makes) units by stock #, VIN, color, model, or trim. Faster than SQL for simple lot lookups.",
     input_schema: { type: "object", properties: { query: { type: "string", description: "e.g. 'white f-150 lariat' or a stock number" } }, required: ["query"] },
   },
+  {
+    name: "lookup_contact",
+    description: "Look up a phone number / email for a person in Bailey's ~35k saved contacts (dealership customers + his network + iPhone). Use when a CRM record is missing a phone.",
+    input_schema: { type: "object", properties: { name: { type: "string" }, phone: { type: "string" } } },
+  },
 ];
 
 async function runTool(name: string, input: any): Promise<string> {
@@ -78,6 +84,10 @@ async function runTool(name: string, input: any): Promise<string> {
     }
     if (name === "search_inventory") {
       return JSON.stringify(localInventorySearch(String(input.query || "")));
+    }
+    if (name === "lookup_contact") {
+      const hit = lookupContact(input.name, input.phone);
+      return hit ? JSON.stringify(hit) : "No contact found in the 35k saved contacts for that name/phone.";
     }
     return `Unknown tool ${name}`;
   } catch (e: any) {
