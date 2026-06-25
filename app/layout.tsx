@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Covert CRM",
+    title: "Covert AI",
     statusBarStyle: "black-translucent",
   },
   icons: {
