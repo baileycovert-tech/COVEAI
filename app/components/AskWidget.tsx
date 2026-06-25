@@ -23,11 +23,12 @@ export default function AskWidget() {
   async function ask(question: string) {
     const text = question.trim();
     if (!text || busy) return;
+    const priorHistory = msgs.map((m) => ({ role: m.role, text: m.text }));
     setMsgs((m) => [...m, { role: "you", text }]);
     setQ("");
     setBusy(true);
     try {
-      const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: text }) });
+      const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: text, history: priorHistory }) });
       const d = await r.json();
       setMsgs((m) => [...m, { role: "bot", text: d.answer || "No answer.", source: d.source }]);
     } catch {
