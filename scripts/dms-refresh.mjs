@@ -109,10 +109,38 @@ async function main() {
     log("inventory units:", units.length);
   } catch (e) { health.errors.inventory = e.message; log("inventory ERR", e.message); }
 
-  // NOTE: month-to-date GROSS/metrics is intentionally NOT refreshed here. The DMS
-  // sales_pace gross differs from Bailey's authoritative Drive-log gross (~$15k gap on
-  // a quick check), so the sold/gross numbers stay on the Drive-log path (covert-crm-sold).
-  // This refresher owns the live PEOPLE side (leads→customers→pipeline) + inventory only.
+  // ---- 3. SOLD DEALS DATABASE — every Bailey deal w/ gross, clickable by deal #. ----
+  try {
+    const pace = await q(
+      `SELECT "DATE" AS d, "DEAL" AS deal, "FRONT-GROSS" AS front, "BACK-GROSS" AS back, "MSRP" AS msrp,
+              "ACV-TRADE1" AS trade, "STORE" AS store, "NUO" AS nuo, "LAST-NAME" AS lastname,
+              "STK-NO" AS stock, "VIN" AS vin, "BANK-NAME" AS bank, "DAYS-IN-STK" AS daysstk
+       FROM sales_pace WHERE "S1-NUMBER" IN ('1249','3001249') ORDER BY "DATE" DESC LIMIT 400`
+    );
+    const sc = await q(
+      `SELECT stock_number AS stock, customer, year, make, model, inventory_type FROM scorecard_sales
+       WHERE POSITION('Bailey' IN COALESCE(sales_representative,'')) > 0 AND sold_date >= (CURRENT_DATE - INTERVAL '400 days') LIMIT 400`
+    );
+    const byStock = {};
+    for (const r of sc) if (r.stock) byStock[String(r.stock).toLowerCase()] = r;
+    const deals = pace.map((p) => {
+      const m = byStock[String(p.stock || "").toLowerCase()] || {};
+      const front = num(p.front) || 0, back = num(p.back) || 0;
+      return {
+        id: String(p.deal), date: (p.d || "").slice(0, 10), deal: p.deal,
+        customer: m.customer || titleCaseName(p.lastname), stock: p.stock, vin: p.vin,
+        nuo: (p.nuo || "").toUpperCase(), store: p.store === "03/01" ? "Chevy" : p.store === "04/01" ? "Ford" : p.store,
+        year: m.year || null, make: m.make || null, model: m.model || null,
+        front: Math.round(front), back: Math.round(back), gross: Math.round(front + back),
+        msrp: num(p.msrp) ? Math.round(p.msrp) : null, trade: num(p.trade) ? Math.round(p.trade) : null,
+        bank: p.bank || null, daysInStock: p.daysstk || null,
+      };
+    }).filter((d) => d.stock || d.deal);
+    const totalGross = deals.reduce((n, d) => n + (d.gross || 0), 0);
+    write("sold.json", JSON.stringify({ asOf: today(), source: "GMReview sales_pace + scorecard_sales (live)", count: deals.length, totalGross, deals }, null, 2));
+    health.ok.sold = deals.length;
+    log("sold deals:", deals.length, "$" + totalGross);
+  } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
   await client.close();
   clearTimeout(deadline);
@@ -130,5 +158,6 @@ async function main() {
 }
 
 function today() { return new Date().toISOString().slice(0, 10); }
+function titleCaseName(s) { return (s || "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) || "—"; }
 
 main().catch((e) => { console.error("FATAL", e); try { write("_refresh-log.json", JSON.stringify({ at: new Date().toISOString(), fatal: String(e) }, null, 2)); } catch {} process.exit(1); });

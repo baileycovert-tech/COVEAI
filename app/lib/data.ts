@@ -73,6 +73,16 @@ export const getLeadFeed = (slug: string) => {
   return all[slug] || [];
 };
 
+export type SoldDeal = {
+  id: string; date: string; deal: number; customer: string; stock: string; vin: string;
+  nuo: string; store: string; year: number | null; make: string | null; model: string | null;
+  front: number; back: number; gross: number; msrp: number | null; trade: number | null;
+  bank: string | null; daysInStock: string | null;
+};
+export const getSold = () =>
+  read<{ asOf: string; source: string; count: number; totalGross: number; deals: SoldDeal[] }>(
+    "sold.json", { asOf: "", source: "", count: 0, totalGross: 0, deals: [] });
+
 const normName = (s: string) =>
   (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 
