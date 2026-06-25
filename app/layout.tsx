@@ -10,12 +10,12 @@ import { getProfile } from "./lib/data";
 import { readSession, COOKIE, getUserBySlug } from "./lib/auth";
 
 export const metadata: Metadata = {
-  title: "Covert CRM — Live Sales Assistant",
+  title: "COVE — Your AI Sales Assistant",
   description: "Bailey Covert's live car-sales CRM, pipeline, and AI outreach.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Covert AI",
+    title: "COVE",
     statusBarStyle: "black-translucent",
   },
   icons: {

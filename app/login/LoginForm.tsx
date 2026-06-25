@@ -27,7 +27,10 @@ export default function LoginForm({ roster, next }: { roster: { slug: string; na
         <div className="brand" style={{ justifyContent: "center", marginBottom: 6 }}>
           <div className="brand-logo">C</div>
         </div>
-        <h1 style={{ textAlign: "center", fontSize: 22, fontWeight: 760, margin: "6px 0 2px" }}>Covert CRM</h1>
+        <h1 style={{ textAlign: "center", fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", margin: "6px 0 0" }}>COVE</h1>
+        <p style={{ textAlign: "center", color: "hsl(var(--primary))", fontSize: 13, fontWeight: 600, margin: "2px 0 14px" }}>
+          Your AI Sales Assistant
+        </p>
         <p style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 13, marginBottom: 22 }}>
           Sign in with your Covert employee number.
         </p>

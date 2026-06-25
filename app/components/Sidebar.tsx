@@ -32,8 +32,8 @@ export default function Sidebar({ name, title, isAdmin }: { name: string; title:
       <div className="brand">
         <div className="brand-logo">C</div>
         <div>
-          <div className="brand-name">Covert CRM</div>
-          <div className="brand-sub">Live Sales Assistant</div>
+          <div className="brand-name">COVE</div>
+          <div className="brand-sub">Your AI Sales Assistant</div>
         </div>
       </div>
       <nav className="nav">

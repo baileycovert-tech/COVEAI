@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Covert AI — Live Sales Assistant",
-    short_name: "Covert AI",
+    name: "COVE — Your AI Sales Assistant",
+    short_name: "COVE",
     description: "Live car-sales board, pipeline, and AI outreach.",
     start_url: "/",
     display: "standalone",

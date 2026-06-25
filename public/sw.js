@@ -1,11 +1,11 @@
-// Covert CRM service worker — receives web-push and shows the notification.
+// COVE service worker — receives web-push and shows the notification.
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
-  const title = data.title || "Covert CRM";
+  const title = data.title || "COVE";
   const options = {
     body: data.body || "",
     icon: "/icon-192.png",
