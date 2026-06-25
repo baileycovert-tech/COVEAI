@@ -22,11 +22,18 @@ Start it: `cd "Covert Sales Assistant/covert-crm" && ./run.sh`
   voice, looks up contacts. Renamed throughout incl. login: **"COVE — Your AI Sales Assistant"**.
 - **Used inventory** (all makes, 432 units) added to search; **Sold** tab with clickable detail.
 
+## ✅ Also landed
+- **P2 Store-location filter** on /inventory — **multi-select lot chips** with live counts
+  (Hutto Ford New 306 · Hutto Chevy New 402 · Certified Pre-Owned 216 · Used/Trade-ins 216),
+  derived from the **stock-number prefix** (the book is the Hutto rooftop; no rooftop column, so
+  prefix = lot — see DECISIONS D14). Selection **persists per browser** (`localStorage`). A "Stock
+  codes" legend explains the prefixes. Other rooftops (Bastrop/Austin/Cadillac) come online when the
+  **websites feed (P1)** is wired — they'll add as more chips.
+
 ## 🔜 Next (priority order)
 - **P1 Websites** — `com.covert.websites-mcp` (cross-rooftop inventory) is running; connection is
   fixed but its server returns a tool-result format the modern SDK rejects → needs that server's
-  code updated. Deferred, not blocking.
-- **P2 Store-location filter** on /inventory (Hutto Ford/Chevy, Bastrop, etc.) — not started.
+  code updated. Deferred, not blocking. (Unlocks the other-rooftop lot chips in P2.)
 - **Make iMessage capture truly autonomous** — grant Full Disk Access so `imessage-tail.mjs` can read
   chat.db on a cron (install via a launchd helper). Until then it runs when the `covert-crm-comms`
   scheduled task fires in a session.

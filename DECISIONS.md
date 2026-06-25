@@ -93,3 +93,21 @@ The autonomous `dms-refresh` + COVE's `query_dms` are getting 403 from gmmcp.sla
 (worked earlier). Per Bailey, DMS wiring is DEFERRED, so I left it failing-gracefully (leads/
 inventory served from the last good pull; COVE says it can't reach the DMS rather than guessing).
 *Revisit-if:* the endpoint/token changes — re-test the connection.
+Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refresh.sh 1800`) so we
+stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
+is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
+
+### D14 — P2 store-location filter = stock-prefix lot map (single rooftop) (2026-06-25)
+The /inventory book the app holds is the **Hutto rooftop** (Covert Ford Chevrolet Hutto). There's
+no rooftop column in the data, so "store location" is derived from the **stock-number prefix**,
+mapped from the live 1,140-unit book:
+  - **Hutto Ford — New**: stock `26xxxx` (digits) · `P·` (P260987) · `T·` Ford (T260834)  → 306 units
+  - **Hutto Chevy — New**: stock `36xxxx` (digits) · `T·` Chevy (T361663)                  → 402 units
+  - **Certified Pre-Owned**: `CP·` (Chevy CPO) · `FP·` (Ford CPO)                            → ~216 units
+  - **Used / Trade-ins (all makes)**: `F· C· FA· CA· FM· CM` — trailing A/B/C = appraisal/recon pass
+  CM = Cadillac trades, FM/CM = Manheim-sourced. (`groupOf()` in `InventorySearch.tsx`.)
+The other Covert **rooftops** (Bastrop / Austin / Cadillac new) are NOT in this book — they live in
+the cross-rooftop **websites MCP** (P1, deferred). So the filter is **multi-select lot chips** with
+live counts + a "Stock codes" legend, **persisted per-browser** (`localStorage` key
+`cove.inventory.filters.v1`). When P1 lands, add the other-rooftop lots as additional chips/groups.
+*Revisit-if:* a real rooftop/location column appears in the feed — switch `groupOf()` to read it.
