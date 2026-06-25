@@ -45,7 +45,10 @@ if [ "$RUNNING" = "1" ] && [ "$MODE" != "--restart" ]; then
 fi
 
 if [ "$MODE" = "--restart" ]; then
-  echo "-> Rebuilding..."
+  # Clean build: building into .next while the old server still serves from it can
+  # leave mismatched webpack chunks (shows up as a 500 on some routes). Wipe first.
+  echo "-> Clean rebuild..."
+  rm -rf .next
   npm run build
   echo "-> Restarting the launchd service..."
   if launchctl kickstart -k "gui/$(id -u)/com.covert.crm" 2>/dev/null; then
