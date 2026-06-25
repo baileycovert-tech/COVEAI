@@ -69,11 +69,28 @@ async function main() {
     const ford = await q(`SELECT ${cols} FROM ford_inventory_current WHERE ${avail}`);
     const chevy = await q(`SELECT ${cols} FROM chevy_inventory_current WHERE ${avail}`);
     const map = (rows, store) => rows.map((r) => ({
-      stock: r.s, vin: r.v, year: r.y, model: r.m, trim: r.t, ext: r.c, int: r.ic,
-      price: num(r.p) != null ? Math.round(r.p) : null, age: r.a, status: r.st, store,
+      stock: r.s, vin: r.v, year: r.y, make: store, model: r.m, trim: r.t, ext: r.c, int: r.ic,
+      price: num(r.p) != null ? Math.round(r.p) : null, mileage: null, age: r.a, status: r.st, store, condition: "New",
     })).filter((u) => u.stock);
-    const units = [...map(ford, "Ford"), ...map(chevy, "Chevy")].sort((a, b) => a.age - b.age);
-    write("inventory-units.json", JSON.stringify({ asOf: today(), source: "GMReview ford/chevy_inventory_current (live)", units }));
+
+    // USED inventory — ALL makes (trade-ins, off-brand), available only.
+    const used = await q(
+      `SELECT stock_number AS s, vin AS v, year AS y, COALESCE(std_make, make) AS mk,
+              COALESCE(std_model, model) AS m, COALESCE(std_trim, trim_level) AS t,
+              exterior_color AS c, interior_color AS ic, mileage AS mi,
+              CASE WHEN price='NaN'::real THEN NULL ELSE price END AS p,
+              age_in_inventory AS a, status AS st, certification_status AS cert
+       FROM used_inventory WHERE status = 'IN-STOCK'`
+    );
+    const usedUnits = used.map((r) => ({
+      stock: r.s, vin: r.v, year: r.y, make: r.mk, model: r.m,
+      trim: /certified/i.test(r.cert || "") ? `${r.t || ""} (Certified)`.trim() : r.t,
+      ext: r.c, int: r.ic, price: num(r.p) != null ? Math.round(r.p) : null,
+      mileage: num(r.mi), age: r.a, status: r.st, store: "Used", condition: "Used",
+    })).filter((u) => u.stock);
+
+    const units = [...map(ford, "Ford"), ...map(chevy, "Chevy"), ...usedUnits].sort((a, b) => (a.age || 0) - (b.age || 0));
+    write("inventory-units.json", JSON.stringify({ asOf: today(), source: "GMReview ford/chevy_inventory_current + used_inventory (live)", units }));
 
     // aggregate by model for the board (new IN-STOCK only)
     const agg = (rows, store) => {

@@ -7,7 +7,7 @@ const money = (n: number | null) => (n == null ? "—" : "$" + Math.round(n).toL
 
 export default function InventorySearch({ units }: { units: InvUnit[] }) {
   const [q, setQ] = useState("");
-  const [store, setStore] = useState<"all" | "Ford" | "Chevy">("all");
+  const [store, setStore] = useState<"all" | "Ford" | "Chevy" | "Used">("all");
   const [age, setAge] = useState<"all" | "fresh" | "aged">("all");
   const [sort, setSort] = useState<"age" | "price-hi" | "price-lo">("age");
   const [limit, setLimit] = useState(60);
@@ -19,7 +19,7 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
       if (age === "fresh" && u.age > 30) return false;
       if (age === "aged" && u.age < 120) return false;
       if (!terms.length) return true;
-      const hay = `${u.stock} ${u.vin} ${u.year} ${u.model} ${u.trim} ${u.ext} ${u.int} ${u.store} ${u.status}`.toLowerCase();
+      const hay = `${u.stock} ${u.vin} ${u.year} ${u.make || ""} ${u.model} ${u.trim} ${u.ext} ${u.int} ${u.store} ${u.condition || ""} ${u.status}`.toLowerCase();
       return terms.every((t) => hay.includes(t));
     });
     out = out.sort((a, b) =>
@@ -55,9 +55,10 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
       </div>
 
       <div className="flex wrap" style={{ gap: 8, marginBottom: 14 }}>
-        <Chip on={store === "all"} onClick={() => setStore("all")}>All stores</Chip>
-        <Chip on={store === "Ford"} onClick={() => setStore("Ford")}>Ford</Chip>
-        <Chip on={store === "Chevy"} onClick={() => setStore("Chevy")}>Chevy</Chip>
+        <Chip on={store === "all"} onClick={() => setStore("all")}>All</Chip>
+        <Chip on={store === "Ford"} onClick={() => setStore("Ford")}>Ford (new)</Chip>
+        <Chip on={store === "Chevy"} onClick={() => setStore("Chevy")}>Chevy (new)</Chip>
+        <Chip on={store === "Used"} onClick={() => setStore("Used")}>Used (all makes)</Chip>
         <span style={{ width: 1, background: "hsl(var(--border))", margin: "0 4px" }} />
         <Chip on={age === "all"} onClick={() => setAge("all")}>Any age</Chip>
         <Chip on={age === "fresh"} onClick={() => setAge("fresh")}>Fresh (≤30d)</Chip>
@@ -80,10 +81,11 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
               <tr key={u.stock + u.vin}>
                 <td style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{u.stock}</td>
                 <td>
-                  {u.year} {u.model} {u.trim && <span className="muted">{u.trim}</span>}
-                  <span className={"badge " + (u.store === "Ford" ? "ford" : "chevy")} style={{ marginLeft: 6 }}>{u.store}</span>
+                  {u.year} {u.store === "Used" && u.make ? titleCase(u.make) + " " : ""}{u.model} {u.trim && <span className="muted">{u.trim}</span>}
+                  <span className={"badge " + (u.store === "Ford" ? "ford" : u.store === "Chevy" ? "chevy" : "used")} style={{ marginLeft: 6 }}>{u.store === "Used" ? "Used" : u.store}</span>
+                  {u.mileage ? <span className="muted" style={{ fontSize: 11 }}> · {Math.round(u.mileage / 1000)}k mi</span> : null}
                 </td>
-                <td>{titleCase(u.ext)}{u.int && u.int !== "NaN" ? <span className="muted" style={{ fontSize: 11 }}> / {titleCase(u.int)}</span> : null}</td>
+                <td>{titleCase(u.ext) || "—"}{titleCase(u.int) ? <span className="muted" style={{ fontSize: 11 }}> / {titleCase(u.int)}</span> : null}</td>
                 <td className="num">{money(u.price)}</td>
                 <td className="num">{u.age}d {u.age >= 120 ? <span className="badge aged" style={{ marginLeft: 4 }}>aged</span> : u.age <= 14 ? <span className="badge green" style={{ marginLeft: 4 }}>new</span> : null}</td>
                 <td><span className="muted" style={{ fontSize: 11 }}>{u.status}</span></td>
@@ -104,6 +106,6 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
 }
 
 function titleCase(s: string) {
-  if (!s || s === "NaN") return "";
+  if (!s || /^nan$/i.test(s)) return "";
   return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }

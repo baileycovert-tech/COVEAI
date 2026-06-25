@@ -53,17 +53,19 @@ export default function InventoryPage() {
   const aged = all.filter((r) => r.avgDays >= 120).sort((a, b) => b.avgDays - a.avgDays);
   const totalValue = all.reduce((n, r) => n + r.units * r.avgMsrp, 0);
   const units = getInventoryUnits().units;
+  const usedCount = units.filter((u) => u.store === "Used").length;
+  const newCount = units.length - usedCount;
 
   return (
     <>
       <PageHead
         title="Inventory"
-        sub={`Hutto rooftop new stock — match customers fast, move the aged metal`}
+        sub={`Hutto new + used (all makes) — search any stock, VIN, color, or trim`}
         right={<LivePill text={`As of ${inv.asOf}`} />}
       />
 
       <div className="grid cols-4">
-        <StatCard ico={<Car />} label="New units in stock" value={String(totalUnits)} sub={`${ford.reduce((n, r) => n + r.units, 0)} Ford · ${chevy.reduce((n, r) => n + r.units, 0)} Chevy`} />
+        <StatCard ico={<Car />} label="Units in stock" value={String(units.length)} sub={`${newCount} new · ${usedCount} used`} />
         <StatCard ico={<DollarSign />} label="Inventory value" value={money(totalValue)} sub="At average MSRP" />
         <StatCard ico={<Clock />} label="Aged lines (120+ days)" value={String(aged.length)} sub="Spiff / move-it candidates" />
         <StatCard ico={<Package />} label="Deepest line" value={[...all].sort((a, b) => b.units - a.units)[0]?.model || "—"} sub={`${[...all].sort((a, b) => b.units - a.units)[0]?.units || 0} in stock`} />

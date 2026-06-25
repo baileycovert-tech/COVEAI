@@ -44,7 +44,7 @@ DMS RULES (critical):
   • ford_inventory_current / chevy_inventory_current — unit level: stock_number, vin, year, model, standardized_model, standardized_trim, exterior_color, interior_color, list_price, cost, age, status ('IN-STOCK','SOLD','LOANER'...)
   • fi_deals, used_inventory, employees, scorecard_appointments
 - "Open leads" filter: lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market').
-- For quick inventory lookups you may use search_inventory (local snapshot of available NEW units) instead of SQL.
+- For quick inventory lookups you may use search_inventory (local snapshot of new + used units, all makes) instead of SQL.
 
 DRAFTING TEXTS (when asked to write/draft a customer message) — LOCKED VOICE:
 "Hey [FirstName] — Bailey Covert at Covert Hutto, your guy on the [Year] [Make] [Model] [Trim]. Reaching out direct from my cell. What time can you make it out today?"
@@ -60,7 +60,7 @@ const TOOLS = [
   },
   {
     name: "search_inventory",
-    description: "Search the local snapshot of available NEW inventory units by stock #, VIN, color, model, or trim. Faster than SQL for simple lot lookups.",
+    description: "Search the local snapshot of available new + used inventory (all makes) units by stock #, VIN, color, model, or trim. Faster than SQL for simple lot lookups.",
     input_schema: { type: "object", properties: { query: { type: "string", description: "e.g. 'white f-150 lariat' or a stock number" } }, required: ["query"] },
   },
 ];
