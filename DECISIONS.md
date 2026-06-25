@@ -52,6 +52,23 @@ links to /health. *Reversible:* `git revert 5f6780f`.
 tracks code only. The live files stay on disk untouched. *Revisit-if:* you want data
 snapshots in git (would need a scrub for PII first).
 
+### D9 — Redesign accent = deep blue, dark default (2026-06-25)
+You picked "start the pro redesign" but didn't specify the accent. I chose **deep
+blue** (primary `hsl(221 83% 53%)` light / `hsl(217 91% 61%)` dark) over graphite —
+continuity with the old accent and the classic SaaS look (Stripe/Linear/Vercel).
+Theme defaults to **dark** (you stare at it all day); a toggle in the sidebar foot
+switches to light. *Reversible:* swap the `--primary` token block in `app/globals.css`
+(and `--ford`/`--chevy` if you want) — one edit re-skins everything. Graphite =
+set `--primary` to a slate like `215 20% 35%`.
+
+### D10 — Re-themed existing CSS instead of rewriting every page in shadcn (2026-06-25)
+shadcn's CLI is interactive and a full per-page component migration mid-session would
+risk a half-broken daily driver. Instead I kept the semantic class names (`.card`,
+`.badge`, …) and re-authored them against shadcn-style tokens, so **all pages upgraded
+at once** and Tailwind utilities are available for new work. Same architecture as
+shadcn (you own the components), lower risk. *Revisit-if:* you specifically want
+the shadcn component files vendored in — that's the phase-2 path in KNOWN-GAPS A1.
+
 ### D8 — No test sends, no new paid services
 Per your rules + safety: generated outreach drafts for the self-test but sent nothing;
 added no Twilio/SendGrid/hosting. Outreach still uses the template fallback because there's

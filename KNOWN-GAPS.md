@@ -8,7 +8,28 @@ Written overnight 2026-06-24 → 2026-06-25. Newest/most-important first.
 
 ---
 
-## A1. 🔴 Visual redesign to "$50k SaaS" quality — NOT STARTED (see DECISIONS D2)
+## A1. 🟡 Visual redesign — PHASE 1 SHIPPED 2026-06-25; phase 2 remaining
+
+**Done (live now):** Tailwind + shadcn-style HSL tokens, **dark mode by default + light
+toggle**, deep-blue accent (DECISIONS D9), Inter-first font, refined spacing/radius/
+shadows, new sidebar + shell with **lucide icons (no emoji anywhere)**, every page
+re-themed and mobile-responsive. All 9 pages build clean and render in both themes.
+
+**Phase 2 (still to do — the interactive polish):**
+- **Command palette (⌘K)** — `cmdk` for jump-to-page / jump-to-customer. Not built.
+- **Data tables** — sortable / filterable / density-toggle (TanStack Table) for
+  Inventory, Customers, Recent deals. Today they're plain styled `<table>`s.
+- **Toasts** — `sonner` for action feedback (draft generated, lead saved, copied).
+  Today those use inline text.
+- **Skeleton loaders** — a `.skeleton` shimmer class exists in globals.css but isn't
+  wired into the 60s auto-refresh yet.
+- **Deeper mobile pass** — works responsively, but the tables could collapse to cards
+  on phone for nicer reading at the lot.
+- Optional: vendor the actual shadcn/ui component files (DECISIONS D10).
+
+(Original note for context, now superseded by the above:)
+
+### (historical) Visual redesign to "$50k SaaS" quality — was NOT STARTED (see DECISIONS D2)
 
 You want: Tailwind + shadcn/ui, Inter, 4/8/16/24/32 spacing scale, one accent (deep blue
 or graphite — **needs your pick**), dark mode, mobile-responsive, cmd-K command palette,
