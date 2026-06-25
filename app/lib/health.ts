@@ -204,26 +204,26 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
     ),
     row(
       "pipeline",
-      "Pipeline (Bailey's wiki)",
-      "Covert Sales Assistant wiki (npm run sync)",
-      "Manual — run `npm run sync`",
+      "Pipeline (live)",
+      "GMReview scorecard_leads (Active) + wiki enrichment → build-crm",
+      "Scheduled task covert-crm-notify · every 5 min",
       "pipeline.json",
-      1440,
-      4320,
+      30,
+      360,
       pipeline.last_refresh || null,
       `${pipeLeads} leads in pipeline`,
       pipeline.last_refresh || null
     ),
     row(
       "customers",
-      "Customer pages (Bailey's wiki)",
-      "Covert Sales Assistant wiki (npm run sync)",
-      "Manual — run `npm run sync`",
+      "Customers (live)",
+      "GMReview scorecard_leads + wiki rapport (union) → build-crm",
+      "Scheduled task covert-crm-notify · every 5 min",
       "customers.json",
-      1440,
-      4320,
+      30,
+      360,
       null,
-      `${customers.length} customer records`
+      `${customers.length} active customers`
     ),
     row(
       "leaderboard",
