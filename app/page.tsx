@@ -2,8 +2,9 @@ import {
   currentMonthBoard, getMetrics, getDeals, getPipeline,
   getCustomers, getProfile, getSignals, getReps, getLeadFeed, redactPhones, monthTotals, money,
 } from "./lib/data";
+import { boardFreshness } from "./lib/health";
 import { currentUser } from "./lib/auth";
-import { PageHead, LivePill, StatCard, UnitsChart, Avatar } from "./components/ui";
+import { PageHead, FreshPill, StatCard, UnitsChart, Avatar } from "./components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -87,8 +88,8 @@ export default function Dashboard() {
       <>
         <PageHead
           title={`${me.name.split(" ")[0]}'s Board`}
-          sub={`Your live month-to-date — ${reps.month || "June 2026"}`}
-          right={<LivePill text="Synced from GMReview CRM" />}
+          sub={`Your month-to-date — ${reps.month || "June 2026"}`}
+          right={<FreshPill {...boardFreshness(["reps.json"])} />}
         />
         <NewLeads leads={myLeads} />
         {!b && <div className="callout" style={{ marginBottom: 16 }}>📣 No CRM-attributed sales recorded yet this month. Walk-ins and repeats can take a day to attribute — your numbers will populate here automatically.</div>}
@@ -129,8 +130,8 @@ export default function Dashboard() {
     <>
       <PageHead
         title="Sales Board"
-        sub={`Live month-to-date — ${profile.currentMonthLabel || board.label} · data through ${(profile.dataThrough || "").slice(5) || "today"}`}
-        right={<LivePill text="Auto-syncs every 60s" />}
+        sub={`Month-to-date — ${profile.currentMonthLabel || board.label} · data through ${(profile.dataThrough || "").slice(5) || "today"}`}
+        right={<FreshPill {...boardFreshness()} />}
       />
       <NewLeads leads={myLeads} />
       <div className="grid cols-4">

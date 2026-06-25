@@ -20,6 +20,29 @@ export function LivePill({ text }: { text: string }) {
   );
 }
 
+// Honest freshness pill: green only when data really is current. When stale/stopped
+// it says so and links to Data Health, so the header never lies about liveness.
+export function FreshPill({
+  status,
+  label,
+}: {
+  status: "live" | "stale" | "old" | "unavailable";
+  label: string;
+}) {
+  const map = {
+    live: { dot: "dot live", text: `Live · updated ${label}` },
+    stale: { dot: "dot amber", text: `Stale · updated ${label}` },
+    old: { dot: "dot red", text: `Not refreshing · last ${label}` },
+    unavailable: { dot: "dot off", text: "No live data" },
+  } as const;
+  const m = map[status];
+  return (
+    <a href="/health" className="pill" style={{ textDecoration: "none" }} title="Open Data Health">
+      <span className={m.dot} /> {m.text}
+    </a>
+  );
+}
+
 export function StatCard({
   label, value, unit, sub, progress, progressGreen, ico,
 }: {

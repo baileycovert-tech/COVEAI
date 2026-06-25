@@ -246,6 +246,19 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
   return { rows, now: new Date(now).toISOString() };
 }
 
+// Headline freshness for a page's live numbers (the board reads deals/metrics/reps).
+// Status reflects the NEWEST of those writes — if even the freshest is old, the
+// whole board is old. Used to render an honest pill instead of a static "Live".
+export function boardFreshness(
+  files: string[] = ["deals.json", "metrics.json", "reps.json"]
+): { status: SourceStatus; label: string; lastWritten: string | null } {
+  const mtimes = files.map(statMs).filter((x): x is number => x != null);
+  if (!mtimes.length) return { status: "unavailable", label: "no data", lastWritten: null };
+  const newest = Math.max(...mtimes);
+  const ageMs = Date.now() - newest;
+  return { status: statusFor(ageMs, 30, 360), label: ageLabel(ageMs), lastWritten: fmtLocal(newest) };
+}
+
 // ---- Send / integration readiness (checked, never exercised — no test sends) ----
 export type Conn = { key: string; label: string; ok: boolean; detail: string };
 
