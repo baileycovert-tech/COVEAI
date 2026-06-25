@@ -1,14 +1,14 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Sparkles } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, KeyRound, Check } from "lucide-react";
 
 type Msg = { role: "you" | "bot"; text: string; source?: string };
 
 const SUGGESTIONS = [
-  "What color is stock 260897?",
-  "Show me aged Broncos",
-  "VIN for a white F-150",
-  "Did we sell a Telluride this month?",
+  "Who should I follow up with today?",
+  "How am I doing this month?",
+  "Show me used Lexus SUVs",
+  "Draft a text to Dalton Miller",
 ];
 
 export default function AskWidget() {
@@ -16,9 +16,31 @@ export default function AskWidget() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [keyErr, setKeyErr] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => { scroller.current?.scrollTo({ top: 9e9, behavior: "smooth" }); }, [msgs, busy]);
+  useEffect(() => {
+    if (open && hasKey === null) {
+      fetch("/api/settings/key").then((r) => r.json()).then((d) => setHasKey(!!d.hasKey)).catch(() => setHasKey(false));
+    }
+  }, [open, hasKey]);
+
+  async function saveKey() {
+    const k = keyInput.trim();
+    if (!k || savingKey) return;
+    setSavingKey(true); setKeyErr("");
+    try {
+      const r = await fetch("/api/settings/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k }) });
+      const d = await r.json();
+      if (d.ok) { setHasKey(true); setKeyInput(""); setMsgs((m) => [...m, { role: "bot", text: "Full assistant unlocked. Ask me anything — I'll query the live database, work your pipeline, and draft in your voice.", source: "ai" }]); }
+      else setKeyErr(d.error || "Could not save the key.");
+    } catch { setKeyErr("Could not save the key."); }
+    finally { setSavingKey(false); }
+  }
 
   async function ask(question: string) {
     const text = question.trim();
@@ -52,14 +74,30 @@ export default function AskWidget() {
         <div className="flex" style={{ gap: 8 }}>
           <span style={{ display: "inline-flex", color: "hsl(var(--primary))" }}><Sparkles size={16} /></span>
           <strong style={{ fontSize: 14 }}>Ask the CRM</strong>
+          {hasKey && <span className="badge green" style={{ fontSize: 10 }}><Check size={11} /> Full</span>}
         </div>
         <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => setOpen(false)} aria-label="Close"><X size={15} /></button>
       </div>
 
       <div className="ask-body" ref={scroller}>
+        {/* Key entry — shown only until a key is active. Entered here, never in chat. */}
+        {hasKey === false && (
+          <div className="ask-keybox">
+            <div className="flex" style={{ gap: 7, fontWeight: 600, fontSize: 13 }}><KeyRound size={15} /> Unlock the full assistant</div>
+            <div className="ask-hint" style={{ marginTop: 6 }}>
+              Paste your Anthropic API key (starts with <code>sk-ant-</code>) to turn on full back-and-forth — live DB questions, follow-ups, and drafting, like Cowork. It's saved only on this Mac, never shared. Get one at console.anthropic.com → API Keys.
+            </div>
+            <div className="flex" style={{ gap: 6, marginTop: 8 }}>
+              <input className="field" type="password" placeholder="sk-ant-…" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveKey()} />
+              <button className="btn primary" onClick={saveKey} disabled={savingKey || !keyInput.trim()} style={{ padding: "0 14px" }}>{savingKey ? "…" : "Unlock"}</button>
+            </div>
+            {keyErr && <div className="ask-src" style={{ color: "hsl(var(--danger))", marginTop: 6 }}>{keyErr}</div>}
+          </div>
+        )}
+
         {msgs.length === 0 && (
           <div>
-            <div className="ask-hint">Ask about a stock #, VIN, color, trim, a past deal, or a customer. Answers come straight from your live data.</div>
+            <div className="ask-hint">Ask about your pipeline, a deal, a stock #/VIN, inventory, or “draft a text to …”. Answers come straight from your live data.</div>
             <div className="flex wrap" style={{ gap: 6, marginTop: 10 }}>
               {SUGGESTIONS.map((s) => (
                 <button key={s} className="pill" style={{ cursor: "pointer", fontSize: 11 }} onClick={() => ask(s)}>{s}</button>
@@ -69,12 +107,12 @@ export default function AskWidget() {
         )}
         {msgs.map((m, i) => (
           <div key={i} className={"ask-msg " + m.role}>
-            {m.text.split("\n").map((line, j) => <div key={j}>{line || " "}</div>)}
+            {m.text.split("\n").map((line, j) => <div key={j}>{line || " "}</div>)}
             {m.role === "bot" && m.source === "lookup" && <div className="ask-src">direct from CRM data</div>}
-            {m.role === "bot" && m.source === "ai" && <div className="ask-src">AI over your CRM data</div>}
+            {m.role === "bot" && m.source === "ai" && <div className="ask-src">AI over your live CRM + DMS</div>}
           </div>
         ))}
-        {busy && <div className="ask-msg bot"><span className="muted">searching…</span></div>}
+        {busy && <div className="ask-msg bot"><span className="muted">working…</span></div>}
       </div>
 
       <form className="ask-input" onSubmit={(e) => { e.preventDefault(); ask(q); }}>
