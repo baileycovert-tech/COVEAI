@@ -318,3 +318,17 @@ textarea, input, select { font-family: inherit; font-size: 13px; }
 .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); border-radius: 8px; }
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--foreground) / .06), transparent); animation: shimmer 1.4s infinite; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* ---------- Ask widget (chatbot) ---------- */
+.ask-fab { position: fixed; bottom: 22px; right: 22px; z-index: 50; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; border: none; background: hsl(var(--primary)); color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: 0 8px 24px hsl(var(--primary) / .4); }
+.ask-fab:hover { filter: brightness(1.06); }
+.ask-panel { position: fixed; bottom: 22px; right: 22px; z-index: 50; width: 384px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 90px); display: flex; flex-direction: column; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; animation: fade-in .15s ease-out; }
+.ask-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid hsl(var(--border)); }
+.ask-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ask-hint { font-size: 12.5px; color: hsl(var(--muted-foreground)); line-height: 1.5; }
+.ask-msg { font-size: 13px; line-height: 1.5; padding: 9px 12px; border-radius: 12px; max-width: 92%; white-space: pre-wrap; word-break: break-word; }
+.ask-msg.you { align-self: flex-end; background: hsl(var(--primary)); color: #fff; }
+.ask-msg.bot { align-self: flex-start; background: hsl(var(--muted) / .6); border: 1px solid hsl(var(--border)); font-variant-numeric: tabular-nums; }
+.ask-src { font-size: 10px; color: hsl(var(--faint)); margin-top: 5px; }
+.ask-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid hsl(var(--border)); }
+@media (max-width: 760px) { .ask-panel { bottom: 0; right: 0; left: 0; width: 100%; height: 82vh; border-radius: 16px 16px 0 0; } }
