@@ -70,6 +70,49 @@ export const getLeadFeed = (slug: string) => {
   return all[slug] || [];
 };
 
+const normName = (s: string) =>
+  (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+
+// Unified outreach audience = the SAME live lead feed the board shows, merged with
+// the wiki customer pages. New CRM leads appear here automatically (so Outreach stays
+// in sync with everything else that's updating); existing wiki customers keep their
+// full record (contact info + rapport). Leads dedupe into a matching customer page.
+export function getOutreachTargets(repSlug = "bailey-covert"): Customer[] {
+  const customers = getCustomers().filter((c) => c.status !== "closed");
+  const seen = new Set(customers.map((c) => normName(c.name)));
+  const usedSlugs = new Set(customers.map((c) => c.slug));
+  const leadTargets: Customer[] = [];
+
+  for (const l of getLeadFeed(repSlug)) {
+    const key = normName(l.customer);
+    if (!l.customer || !key || seen.has(key)) continue; // already a customer page
+    seen.add(key);
+    let slug = "lead-" + key.replace(/\s+/g, "-");
+    while (usedSlugs.has(slug)) slug += "-2";
+    usedSlugs.add(slug);
+    leadTargets.push({
+      slug,
+      name: l.customer,
+      phone: null,
+      email: null,
+      vehicle_interest: l.vehicle || "",
+      trade: null,
+      stage: "new lead",
+      status: "active",
+      last_touch: l.at || "",
+      // Keep next_step blank so the message body stays customer-safe in template mode;
+      // the lead context lives in `notes`/`source` for the AI prompt + the UI.
+      next_step: "",
+      personal: "",
+      source: l.source || "CRM",
+      notes: `New ${l.source || "CRM"} lead. ${l.match || ""}`.trim(),
+      hot: !!l.urgent,
+    });
+  }
+  // Live leads first (freshest), then existing customers.
+  return [...leadTargets, ...customers];
+}
+
 export type RepBoard = { units: number; newU: number; usedU: number; gross: number };
 export type LeaderRep = { rank: number; name: string; units: number; gross: number };
 export const getReps = () => read("reps.json", { asOf: "", month: "", bySlug: {} as Record<string, RepBoard>, leaderboard: [] as LeaderRep[] } as any);

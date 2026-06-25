@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCustomers, getOutreachQueue, writeData, OutreachDraft } from "../../../lib/data";
+import { getOutreachTargets, getOutreachQueue, writeData, OutreachDraft } from "../../../lib/data";
 import { draftMessage } from "../../../lib/anthropic";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const { slug, channel = "text", intent = "" } = await req.json();
-  const customer = getCustomers().find((c) => c.slug === slug);
+  // Resolve against the same merged audience the picker shows (wiki customers + live leads).
+  const customer = getOutreachTargets().find((c) => c.slug === slug);
   if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
   const drafted = await draftMessage({ customer, channel, intent });
