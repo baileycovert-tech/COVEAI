@@ -124,6 +124,12 @@ export default function Dashboard() {
   const unitDelta = board && prev ? board.units - monthTotals(prev).units : 0;
   const recent = [...deals].slice(0, 6);
   const hotLeads = pipeline.columns.find((c) => c.key === "hot")?.leads ?? [];
+  // Pipeline leads come from the wiki sync. If that sync is old, these are NOT the
+  // current leads — say so on the card instead of presenting stale leads as live.
+  const pipeDays = pipeline.last_refresh
+    ? Math.floor((Date.now() - new Date(pipeline.last_refresh).getTime()) / 86400000)
+    : null;
+  const pipeStale = pipeDays != null && pipeDays > 2;
   if (!board) return <div className="empty">No sales data yet.</div>;
 
   return (
@@ -179,6 +185,14 @@ export default function Dashboard() {
             <div className="card-title"><span className="ico">🔥</span>Hot — act now</div>
             <a className="card-link" href="/pipeline">Full pipeline →</a>
           </div>
+          {pipeStale && (
+            <div className="callout warn" style={{ marginBottom: 12, fontSize: 12 }}>
+              These leads are from your last wiki sync ({pipeline.last_refresh}) — {pipeDays} days ago.
+              New leads since then aren’t here yet. Run a live refresh from a Claude session with the
+              GMReview connector (“refresh my sales board” + scan texts), then <code>npm run sync</code>.
+              See <a className="card-link" href="/health">Data Health</a>.
+            </div>
+          )}
           {hotLeads.length === 0 && <div className="empty">No hot leads flagged.</div>}
           {hotLeads.slice(0, 6).map((l, i) => (
             <div className="row-item" key={i}>
