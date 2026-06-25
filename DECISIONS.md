@@ -73,3 +73,23 @@ the shadcn component files vendored in — that's the phase-2 path in KNOWN-GAPS
 Per your rules + safety: generated outreach drafts for the self-test but sent nothing;
 added no Twilio/SendGrid/hosting. Outreach still uses the template fallback because there's
 no `ANTHROPIC_API_KEY` in `.env.local` (add one to get AI-quality drafts — see KNOWN-GAPS #B1).
+
+### D11 — iMessage ingestion via a source-agnostic inbox (2026-06-25)
+The iMessage MCP works in a Claude session but a cron can't call it, and chat.db needs Full Disk
+Access. So `imessage-ingest.mjs` reads from an **inbox file** (`_imessage-incoming.json`) that any
+source writes — MCP (scheduled task), `imessage-tail.mjs` (chat.db, needs FDA), or a fixture. This
+decouples capture from classification so leads are never lost regardless of which source is live.
+*Revisit-if:* you grant FDA — then the chat.db tail is the primary autonomous source.
+
+### D12 — Contacts enrichment from the 35k CSV export, not live Contacts (2026-06-25)
+The "no phone" bug: web/text leads have no phone in scorecard_leads. Rather than hit macOS Contacts
+live (per-request, permissioned), I indexed the existing `sources/customers/*.csv` (34.5k dealership
+list + network + iPhone export) into `data/contacts.db` and enrich on lookup by an order-independent
+name key. Static snapshot — re-run `build-contacts.mjs` after a fresh export. Only fills when the
+SAME person is found (won't borrow a different "Miller"'s number).
+
+### D13 — DMS returns 403 from the app's direct queries (2026-06-25)
+The autonomous `dms-refresh` + COVE's `query_dms` are getting 403 from gmmcp.slaxer07.com now
+(worked earlier). Per Bailey, DMS wiring is DEFERRED, so I left it failing-gracefully (leads/
+inventory served from the last good pull; COVE says it can't reach the DMS rather than guessing).
+*Revisit-if:* the endpoint/token changes — re-test the connection.
