@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import Sidebar from "./components/Sidebar";
 import AutoRefresh from "./components/AutoRefresh";
 import PushSetup from "./components/PushSetup";
+import ThemeProvider from "./components/ThemeProvider";
 import { getProfile } from "./lib/data";
 import { readSession, COOKIE, getUserBySlug } from "./lib/auth";
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0f17",
+  themeColor: "#0b0e16",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -36,23 +37,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // Logged out (only the login page is reachable) — render bare, no app shell.
   if (!session) {
     return (
-      <html lang="en">
-        <body>{children}</body>
+      <html lang="en" suppressHydrationWarning>
+        <body>
+          <ThemeProvider>{children}</ThemeProvider>
+        </body>
       </html>
     );
   }
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <div className="app">
-          <Sidebar name={session.name} title="Covert Auto Group — Hutto" isAdmin={!!getUserBySlug(session.slug)?.isAdmin} />
-          <main className="main">
-            <AutoRefresh lastSync={p.lastSync} />
-            <PushSetup vapidPublic={process.env.NEXT_PUBLIC_VAPID_PUBLIC || ""} />
-            {children}
-          </main>
-        </div>
+        <ThemeProvider>
+          <div className="app">
+            <Sidebar name={session.name} title="Covert Auto Group — Hutto" isAdmin={!!getUserBySlug(session.slug)?.isAdmin} />
+            <main className="main">
+              <AutoRefresh lastSync={p.lastSync} />
+              <PushSetup vapidPublic={process.env.NEXT_PUBLIC_VAPID_PUBLIC || ""} />
+              {children}
+            </main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
