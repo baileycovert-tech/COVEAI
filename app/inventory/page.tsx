@@ -1,6 +1,7 @@
-import { getInventory, money } from "../lib/data";
+import { getInventory, getInventoryUnits, money } from "../lib/data";
 import { PageHead, LivePill, StatCard } from "../components/ui";
 import { Car, DollarSign, Clock, Package, Target } from "lucide-react";
+import InventorySearch from "./InventorySearch";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default function InventoryPage() {
   const totalUnits = all.reduce((n, r) => n + r.units, 0);
   const aged = all.filter((r) => r.avgDays >= 120).sort((a, b) => b.avgDays - a.avgDays);
   const totalValue = all.reduce((n, r) => n + r.units * r.avgMsrp, 0);
+  const units = getInventoryUnits().units;
 
   return (
     <>
@@ -75,6 +77,8 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {units.length > 0 && <InventorySearch units={units} />}
 
       <div className="grid cols-2 section-gap">
         <Table title="New inventory by model" rows={ford} tone="ford" />
