@@ -1,0 +1,15 @@
+# deps & build
+node_modules
+.next
+*.log
+.DS_Store
+next-env.d.ts
+
+# secrets — never commit
+.env.local
+data/.session-secret
+
+# runtime data (live refresh churn + customer PII) — not version controlled.
+# The running instance holds the real files on disk; git tracks code only.
+data/*.json
+data/.lead-seen.json
