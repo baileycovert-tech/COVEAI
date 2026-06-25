@@ -12,6 +12,7 @@ const NAV = [
   { section: "Know" },
   { href: "/inventory", label: "Inventory", ico: "🚙" },
   { href: "/metrics", label: "Metrics", ico: "📈", admin: true },
+  { href: "/health", label: "Data Health", ico: "🩺", admin: true },
 ];
 
 export default function Sidebar({ name, title, isAdmin }: { name: string; title: string; isAdmin?: boolean }) {
