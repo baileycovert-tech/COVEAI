@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
 
 function urlB64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -49,7 +50,7 @@ export default function PushSetup({ vapidPublic }: { vapidPublic: string }) {
 
   return (
     <div className="push-bar">
-      <span>🔔</span>
+      <span style={{ display: "inline-flex", color: "hsl(var(--primary))" }}><Bell size={16} /></span>
       {state === "needs-install" ? (
         <span>To get lead alerts on your phone: tap <strong>Share → Add to Home Screen</strong>, then open the app from your home screen and enable here.</span>
       ) : state === "blocked" ? (

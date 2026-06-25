@@ -47,11 +47,11 @@ export function StatCard({
   label, value, unit, sub, progress, progressGreen, ico,
 }: {
   label: string; value: string; unit?: string; sub?: React.ReactNode;
-  progress?: number; progressGreen?: boolean; ico?: string;
+  progress?: number; progressGreen?: boolean; ico?: React.ReactNode;
 }) {
   return (
     <div className="card">
-      <div className="stat-label">{ico && <span>{ico}</span>}{label}</div>
+      <div className="stat-label">{ico && <span className="stat-ico">{ico}</span>}{label}</div>
       <div className="stat-value">
         {value}{unit && <small> {unit}</small>}
       </div>

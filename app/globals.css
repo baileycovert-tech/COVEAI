@@ -284,7 +284,11 @@ tbody tr:hover { background: hsl(var(--muted) / .5); }
 .kv dd { margin: 0; }
 .tag-rank { font-weight: 800; width: 26px; color: hsl(var(--faint)); font-variant-numeric: tabular-nums; }
 .callout { background: hsl(var(--primary) / .07); border: 1px solid hsl(var(--primary) / .22); border-radius: 11px; padding: 13px 15px; font-size: 13px; line-height: 1.55; color: hsl(var(--foreground)); }
-.callout .ico { margin-right: 7px; }
+.callout .ico { display: inline-flex; vertical-align: -3px; margin-right: 7px; color: hsl(var(--primary)); }
+.callout .ico svg { width: 15px; height: 15px; }
+.callout.warn .ico { color: hsl(var(--warning)); }
+.callout.bad .ico { color: hsl(var(--danger)); }
+.stat-ico { display: inline-flex; color: hsl(var(--muted-foreground)); }
 .callout.warn { background: hsl(var(--warning) / .08); border-color: hsl(var(--warning) / .3); }
 .callout.bad { background: hsl(var(--danger) / .08); border-color: hsl(var(--danger) / .28); }
 textarea, input, select { font-family: inherit; font-size: 13px; }

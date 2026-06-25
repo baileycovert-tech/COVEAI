@@ -5,6 +5,10 @@ import {
 import { boardFreshness } from "./lib/health";
 import { currentUser } from "./lib/auth";
 import { PageHead, FreshPill, StatCard, UnitsChart, Avatar } from "./components/ui";
+import {
+  Bell, Car, DollarSign, ClipboardList, Trophy, Radio, BarChart3,
+  Flame, ReceiptText, Lightbulb, Megaphone, CarFront,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +23,7 @@ function NewLeads({ leads }: { leads: any[] }) {
   return (
     <div className="card section-gap">
       <div className="card-head">
-        <div className="card-title"><span className="ico">🔔</span>Your new leads <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— auto-matched to stock</span></div>
+        <div className="card-title"><span className="ico"><Bell /></span>Your new leads <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— auto-matched to stock</span></div>
         <span className="pill"><span className="dot live" /> live</span>
       </div>
       {leads.slice(0, 6).map((l, i) => (
@@ -27,7 +31,7 @@ function NewLeads({ leads }: { leads: any[] }) {
           <span className="badge hot" style={{ minWidth: 60, justifyContent: "center" }}>NEW</span>
           <div className="row-main">
             <div className="row-title">{l.customer} {l.vehicle && <span className="muted" style={{ fontSize: 12 }}>· {l.vehicle}</span>}</div>
-            <div className="row-sub">🚗 {redactPhones(l.match)} · via {l.source}</div>
+            <div className="row-sub">{redactPhones(l.match)} · via {l.source}</div>
           </div>
           <span className="muted" style={{ fontSize: 11 }}>{(l.at || "").replace("T", " ").slice(5, 16)}</span>
         </div>
@@ -43,7 +47,7 @@ function Leaderboard({ rows, meName }: { rows: any[]; meName: string }) {
   return (
     <div className="card pad-lg">
       <div className="card-head">
-        <div className="card-title"><span className="ico">🏆</span>Group leaderboard</div>
+        <div className="card-title"><span className="ico"><Trophy /></span>Group leaderboard</div>
         <span className="muted" style={{ fontSize: 11 }}>June · CRM-attributed gross</span>
       </div>
       {top.map((r) => {
@@ -60,7 +64,7 @@ function Leaderboard({ rows, meName }: { rows: any[]; meName: string }) {
         );
       })}
       {showMe && (
-        <div className="row-item" style={{ borderTop: "1px dashed var(--border)", marginTop: 4 }}>
+        <div className="row-item" style={{ borderTop: "1px dashed hsl(var(--border))", marginTop: 4 }}>
           <span className="tag-rank">#{meRow.rank}</span>
           <Avatar name={meRow.name} me />
           <div className="row-main"><div className="row-title">{meRow.name} <span className="badge new" style={{ marginLeft: 8 }}>You</span> <span className="muted" style={{ fontSize: 11 }}>· {meRow.units}u</span></div></div>
@@ -92,17 +96,17 @@ export default function Dashboard() {
           right={<FreshPill {...boardFreshness(["reps.json"])} />}
         />
         <NewLeads leads={myLeads} />
-        {!b && <div className="callout" style={{ marginBottom: 16 }}>📣 No CRM-attributed sales recorded yet this month. Walk-ins and repeats can take a day to attribute — your numbers will populate here automatically.</div>}
+        {!b && <div className="callout" style={{ marginBottom: 16 }}><span className="ico"><Megaphone /></span>No CRM-attributed sales recorded yet this month. Walk-ins and repeats can take a day to attribute — your numbers will populate here automatically.</div>}
         <div className="grid cols-4">
-          <StatCard ico="🚗" label="Units MTD" value={String(b?.units ?? 0)} sub={`${b?.newU ?? 0} new / ${b?.usedU ?? 0} used`} />
-          <StatCard ico="💰" label="Total gross MTD" value={money(gross)} sub="CRM-attributed" />
-          <StatCard ico="📋" label="Per-unit gross" value={b && b.units ? money(gross / b.units) : "—"} sub="Avg this month" />
-          <StatCard ico="🏆" label="Group rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="By CRM-attributed gross" />
+          <StatCard ico={<Car />} label="Units MTD" value={String(b?.units ?? 0)} sub={`${b?.newU ?? 0} new / ${b?.usedU ?? 0} used`} />
+          <StatCard ico={<DollarSign />} label="Total gross MTD" value={money(gross)} sub="CRM-attributed" />
+          <StatCard ico={<ClipboardList />} label="Per-unit gross" value={b && b.units ? money(gross / b.units) : "—"} sub="Avg this month" />
+          <StatCard ico={<Trophy />} label="Group rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="By CRM-attributed gross" />
         </div>
         <div className="grid cols-2 section-gap">
           <Leaderboard rows={lbRows} meName={me.name} />
           <div className="card pad-lg">
-            <div className="card-title" style={{ marginBottom: 10 }}>🚙 Move the metal</div>
+            <div className="card-title" style={{ marginBottom: 10 }}><span className="ico"><CarFront /></span>Move the metal</div>
             <div className="lead-note" style={{ fontSize: 13, lineHeight: 1.6 }}>
               Your sold numbers refresh automatically from GMReview. Check <a className="card-link" href="/inventory">Inventory</a> for the freshest stock and the aged units carrying the most markdown — those are your fastest path up the board.
             </div>
@@ -141,18 +145,18 @@ export default function Dashboard() {
       />
       <NewLeads leads={myLeads} />
       <div className="grid cols-4">
-        <StatCard ico="🚗" label="Units MTD" value={String(board.units)}
+        <StatCard ico={<Car />} label="Units MTD" value={String(board.units)}
           sub={<><span className={"delta " + (unitDelta >= 0 ? "up" : "down")}>{unitDelta >= 0 ? "▲" : "▼"} {Math.abs(unitDelta)} vs {prev?.label}</span> · {board.newUnits}N / {board.usedUnits}U</>}
           progress={board.unitPct} />
-        <StatCard ico="💰" label="Total Gross MTD" value={money(board.totalGross)} sub={<>Goal {money(board.grossGoal)} · {board.grossPct}% there</>} progress={board.grossPct} progressGreen />
-        <StatCard ico="📋" label="Front PVR" value={money(board.frontPvr)} sub={<>F&I PVR {money(board.fiPvr)} per unit</>} />
-        <StatCard ico="🏆" label="Group Rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="June · CRM-attributed" />
+        <StatCard ico={<DollarSign />} label="Total Gross MTD" value={money(board.totalGross)} sub={<>Goal {money(board.grossGoal)} · {board.grossPct}% there</>} progress={board.grossPct} progressGreen />
+        <StatCard ico={<ClipboardList />} label="Front PVR" value={money(board.frontPvr)} sub={<>F&I PVR {money(board.fiPvr)} per unit</>} />
+        <StatCard ico={<Trophy />} label="Group Rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="June · CRM-attributed" />
       </div>
 
       {signals.length > 0 && (
         <div className="card section-gap">
           <div className="card-head">
-            <div className="card-title"><span className="ico">📡</span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>
+            <div className="card-title"><span className="ico"><Radio /></span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>
             <span className="pill"><span className="dot live" /> auto</span>
           </div>
           {signals.slice(0, 6).map((s, i) => (
@@ -171,7 +175,7 @@ export default function Dashboard() {
       <div className="grid cols-2 section-gap">
         <div className="card pad-lg">
           <div className="card-head">
-            <div className="card-title"><span className="ico">📈</span>Units by month</div>
+            <div className="card-title"><span className="ico"><BarChart3 /></span>Units by month</div>
             <a className="card-link" href="/metrics">All metrics →</a>
           </div>
           <UnitsChart data={months.map((m) => ({ label: m.label, newUnits: m.newUnits, usedUnits: m.usedUnits }))} />
@@ -182,7 +186,7 @@ export default function Dashboard() {
       <div className="grid cols-2 section-gap">
         <div className="card pad-lg">
           <div className="card-head">
-            <div className="card-title"><span className="ico">🔥</span>Hot — act now</div>
+            <div className="card-title"><span className="ico"><Flame /></span>Hot — act now</div>
             <a className="card-link" href="/pipeline">Full pipeline →</a>
           </div>
           {pipeStale && (
@@ -207,7 +211,7 @@ export default function Dashboard() {
         </div>
         <div className="card pad-lg">
           <div className="card-head">
-            <div className="card-title"><span className="ico">🧾</span>Recent deals</div>
+            <div className="card-title"><span className="ico"><ReceiptText /></span>Recent deals</div>
             <span className="muted" style={{ fontSize: 11 }}>{deals.length} this month</span>
           </div>
           <table>
@@ -231,7 +235,7 @@ export default function Dashboard() {
 
       <div className="card section-gap">
         <div className="callout">
-          <span className="ico">💡</span>
+          <span className="ico"><Lightbulb /></span>
           <strong>Coach read:</strong> You closed <strong>{board.units} units</strong> ({board.newUnits} new / {board.usedUnits} used) for {money(board.totalGross)} total gross. You have <strong>{hotLeads.length} hot leads</strong> and <strong>{customers.filter((c) => c.status !== "closed").length} active customers</strong> — work the <a className="card-link" href="/outreach">AI Outreach</a> queue to keep them warm.
         </div>
       </div>
