@@ -109,8 +109,10 @@ async function routedLookup(question: string): Promise<string | null> {
     // FOLLOW-UPS — open leads gone quiet.
     if (/\b(follow.?up|who.*(call|reach|contact|work)|need.*call|chase|stale|cold|left to)\b/.test(ql)) {
       const rows = await dmsQuery(`SELECT customer, year, make, model, lead_status, COALESCE(last_customer_contact::text, lead_origination_date::text) AS last FROM scorecard_leads WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0 AND lead_status IN ('Active Lead','New Lead','Waiting for prospect response') AND lead_origination_date >= (CURRENT_DATE - INTERVAL '60 days') AND (last_customer_contact IS NULL OR last_customer_contact < (NOW() - INTERVAL '3 days')) ORDER BY COALESCE(last_customer_contact, lead_origination_date) ASC LIMIT 12`);
-      if (!rows.length) return "No open leads have gone quiet — you're caught up.";
-      return `Follow up with these (quietest first):\n` + rows.map((r: any) => `• ${r.customer} — ${[r.year, r.make, r.model].filter(Boolean).join(" ") || "vehicle TBD"} · last touch ${(r.last || "never").slice(0, 10)} · ${r.lead_status}`).join("\n");
+      const seen = new Set<string>();
+      const uniq = rows.filter((r: any) => { const k = (r.customer || "").toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+      if (!uniq.length) return "No open leads have gone quiet — you're caught up.";
+      return `Follow up with these (quietest first):\n` + uniq.slice(0, 10).map((r: any) => `• ${r.customer} — ${[r.year, r.make, r.model].filter(Boolean).join(" ") || "vehicle TBD"} · last touch ${(r.last || "never").slice(0, 10)} · ${r.lead_status}`).join("\n");
     }
     // PACE / how am I doing this month.
     if (/\b(pace|this month|how.*doing|standing|mtd|my (units|gross|numbers|month)|where am i)\b/.test(ql)) {
