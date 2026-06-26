@@ -2,12 +2,15 @@ import { redirect } from "next/navigation";
 import { getMetrics, getDeals, monthTotals, money } from "../lib/data";
 import { currentUser } from "../lib/auth";
 import { PageHead, StatCard, UnitsChart, GrossTrend } from "../components/ui";
+import RepNumbers from "../components/RepNumbers";
 import { Car, DollarSign, Star, PieChart, ClipboardList, CalendarDays, Lightbulb } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default function MetricsPage() {
-  if (!currentUser()?.seesFinancials) redirect("/");
+  const me = currentUser();
+  if (!me) redirect("/login");
+  if (!me.seesFinancials) return (<><PageHead title="Metrics" sub={`Your numbers this month, ${me.name.split(/\s+/)[0]}`} /><RepNumbers slug={me.slug} name={me.name} /></>);
   const months = getMetrics();
   const deals = getDeals();
 

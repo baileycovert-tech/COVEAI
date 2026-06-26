@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 import { getCustomers } from "../lib/data";
 import { currentUser } from "../lib/auth";
 import { PageHead, Avatar } from "../components/ui";
+import RepNudge from "../components/RepNudge";
 
 export const dynamic = "force-dynamic";
 
 export default function CustomersPage() {
-  if (!currentUser()?.isAdmin) redirect("/");
+  const me = currentUser();
+  if (!me) redirect("/login");
+  if (!me.isAdmin) return (<><PageHead title="Customers" sub="Your customers" /><RepNudge what="customers" /></>);
   const all = getCustomers();
   const active = all.filter((c) => c.status !== "closed");
   const closed = all.filter((c) => c.status === "closed");

@@ -10,25 +10,19 @@ import ThemeToggle from "./ThemeToggle";
 
 type Item = { href: string; label: string; Icon: any; admin?: boolean; fin?: boolean };
 
-// Bottom-bar primaries (max 4 + More). Salesmen swap Pipeline → Add Lead.
-const PRIMARY_ADMIN: Item[] = [
+// Bottom-bar primaries (max 4 + More) — same for everyone now.
+const PRIMARY: Item[] = [
   { href: "/brief", label: "Brief", Icon: Sun },
   { href: "/", label: "Board", Icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", Icon: KanbanSquare },
   { href: "/inventory", label: "Inventory", Icon: Car },
 ];
-const PRIMARY_REP: Item[] = [
-  { href: "/brief", label: "Brief", Icon: Sun },
-  { href: "/", label: "Board", Icon: LayoutDashboard },
-  { href: "/leads/new", label: "Add", Icon: UserPlus },
-  { href: "/inventory", label: "Inventory", Icon: Car },
-];
 const MORE: Item[] = [
   { href: "/leads/new", label: "Add Lead", Icon: UserPlus },
-  { href: "/outreach", label: "AI Outreach", Icon: Sparkles, admin: true },
-  { href: "/customers", label: "Customers", Icon: Users, admin: true },
-  { href: "/sold", label: "Sold", Icon: Receipt, fin: true },
-  { href: "/metrics", label: "Metrics", Icon: TrendingUp, fin: true },
+  { href: "/outreach", label: "AI Outreach", Icon: Sparkles },
+  { href: "/customers", label: "Customers", Icon: Users },
+  { href: "/sold", label: "Sold", Icon: Receipt },
+  { href: "/metrics", label: "Metrics", Icon: TrendingUp },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
   { href: "/setup", label: "Setup", Icon: UserCog },
 ];
@@ -36,7 +30,7 @@ const MORE: Item[] = [
 export default function MobileChrome({ isAdmin, seesFinancials, name }: { isAdmin?: boolean; seesFinancials?: boolean; name: string }) {
   const path = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const primary = isAdmin ? PRIMARY_ADMIN : PRIMARY_REP;
+  const primary = PRIMARY;
   const more = MORE.filter((i) => (!i.admin || isAdmin) && (!i.fin || seesFinancials) && !primary.some((p) => p.href === i.href));
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 

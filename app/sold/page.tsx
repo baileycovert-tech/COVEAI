@@ -4,11 +4,14 @@ import { currentUser } from "../lib/auth";
 import { PageHead, LivePill, StatCard } from "../components/ui";
 import { Receipt, DollarSign, TrendingUp, Car } from "lucide-react";
 import SoldList from "./SoldList";
+import RepNumbers from "../components/RepNumbers";
 
 export const dynamic = "force-dynamic";
 
 export default function SoldPage() {
-  if (!currentUser()?.seesFinancials) redirect("/");
+  const me = currentUser();
+  if (!me) redirect("/login");
+  if (!me.seesFinancials) return (<><PageHead title="Sold" sub={`Your sold numbers this month, ${me.name.split(/\s+/)[0]}`} /><RepNumbers slug={me.slug} name={me.name} /></>);
   const { deals, totalGross, asOf } = getSold();
   const n = deals.length;
   const avg = n ? Math.round(totalGross / n) : 0;

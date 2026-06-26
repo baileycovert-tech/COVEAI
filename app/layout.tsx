@@ -64,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </main>
           </div>
-          {seesFinancials && <AskWidget />}
+          <AskWidget />{/* every rep gets the AI assistant */}
         </ThemeProvider>
       </body>
     </html>

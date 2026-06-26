@@ -5,11 +5,11 @@ import { draftMessage } from "../../lib/anthropic";
 import { lookupContact } from "../../lib/contacts";
 import { currentUser } from "../../lib/auth";
 
-// A restricted (salesperson) login may not pull store financials through COVE.
-// Block any DMS query that touches gross / cost / margin / PVR / F&I, or that
-// aggregates list price or MSRP into an inventory-value figure.
-const FINANCIAL_SQL = /gross|\bcost\b|\bpvr\b|\bmargin\b|\bprofit\b|fi_deals|(sum|avg|total)\s*\(\s*"?(list_price|msrp|cost)/i;
-const RESTRICTED_MSG = "I can't share store financials (gross, cost, inventory value) on your login — check with your manager. I can still pull inventory, leads, customers, follow-ups, or draft a text.";
+// Reps get the full assistant — their numbers, inventory, leads, drafting. The ONLY thing
+// held back from a non-manager login is the lot's aggregate inventory value/worth (and unit
+// cost/margin that backs it). Everything else (gross, pace, deals) is fair game.
+const FINANCIAL_SQL = /\bcost\b|\bmargin\b|inventory[_ ]?(value|worth)|(sum|avg|total)\s*\(\s*"?(list_price|msrp|cost)/i;
+const RESTRICTED_MSG = "I can't share the lot's total inventory value or unit cost on your login. Everything else is fair game — inventory, your leads, follow-ups, drafts, and your numbers.";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
       { role: "user", content: question },
     ];
     const policy = restricted
-      ? "\n\nACCESS LEVEL — RESTRICTED (salesperson, no financial access): NEVER reveal store financials — total/front/back gross, F&I, PVR, vehicle cost, margin, or aggregate inventory value/worth — and never another rep's numbers. You MAY give inventory availability (stock #, color, trim, age, status, a single unit's list price), lead/customer info, follow-ups, and message drafts. If asked for a hidden number, reply exactly: \"" + RESTRICTED_MSG + "\" The query tool will also refuse financial columns."
+      ? "\n\nACCESS LEVEL — SALESPERSON: full assistant. Help with inventory, their leads/customers, follow-ups, pace, their own sold numbers and gross, and message drafts. The ONLY thing you must NOT reveal is the lot's aggregate INVENTORY VALUE/WORTH or unit COST/margin. If asked for that, reply exactly: \"" + RESTRICTED_MSG + "\" Everything else is fine."
       : "";
     const system = SYSTEM + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot();
 

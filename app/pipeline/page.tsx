@@ -3,12 +3,15 @@ import { getPipeline } from "../lib/data";
 import { currentUser } from "../lib/auth";
 import { getRemoved } from "../lib/leads-state";
 import { PageHead, LivePill } from "../components/ui";
+import RepNudge from "../components/RepNudge";
 import PipelineClient from "./PipelineClient";
 
 export const dynamic = "force-dynamic";
 
 export default function PipelinePage() {
-  if (!currentUser()?.isAdmin) redirect("/");
+  const me = currentUser();
+  if (!me) redirect("/login");
+  if (!me.isAdmin) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
   const p = getPipeline();
   const total = p.columns.reduce((n, c) => n + c.leads.length, 0);
   const removed = getRemoved();
