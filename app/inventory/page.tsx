@@ -1,4 +1,5 @@
 import { getInventory, getInventoryUnits, money } from "../lib/data";
+import { currentUser } from "../lib/auth";
 import { PageHead, LivePill, StatCard } from "../components/ui";
 import { Car, DollarSign, Clock, Package, Target } from "lucide-react";
 import InventorySearch from "./InventorySearch";
@@ -55,6 +56,10 @@ export default function InventoryPage() {
   const units = getInventoryUnits().units;
   const usedCount = units.filter((u) => u.store === "Used").length;
   const newCount = units.length - usedCount;
+  // Inventory value (aggregate worth of the lot) is a store financial — managers/admins
+  // only. Restricted salesmen get a non-sensitive tile in its place.
+  const sees = !!currentUser()?.seesFinancials;
+  const avgAge = Math.round(units.reduce((n, u) => n + (u.age || 0), 0) / (units.length || 1));
 
   return (
     <>
@@ -66,7 +71,11 @@ export default function InventoryPage() {
 
       <div className="grid cols-4">
         <StatCard ico={<Car />} label="Units in stock" value={String(units.length)} sub={`${newCount} new · ${usedCount} used`} />
-        <StatCard ico={<DollarSign />} label="Inventory value" value={money(totalValue)} sub="At average MSRP" />
+        {sees ? (
+          <StatCard ico={<DollarSign />} label="Inventory value" value={money(totalValue)} sub="At average MSRP" />
+        ) : (
+          <StatCard ico={<Target />} label="Avg days on lot" value={String(avgAge)} sub="Across all in-stock units" />
+        )}
         <StatCard ico={<Clock />} label="Aged lines (120+ days)" value={String(aged.length)} sub="Spiff / move-it candidates" />
         <StatCard ico={<Package />} label="Deepest line" value={[...all].sort((a, b) => b.units - a.units)[0]?.model || "—"} sub={`${[...all].sort((a, b) => b.units - a.units)[0]?.units || 0} in stock`} />
       </div>

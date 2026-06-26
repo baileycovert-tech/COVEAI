@@ -3,6 +3,13 @@ import { getInventoryUnits, getDeals, getCustomers, getPipeline, getReps, getOut
 import { dmsQuery } from "../../lib/dms";
 import { draftMessage } from "../../lib/anthropic";
 import { lookupContact } from "../../lib/contacts";
+import { currentUser } from "../../lib/auth";
+
+// A restricted (salesperson) login may not pull store financials through COVE.
+// Block any DMS query that touches gross / cost / margin / PVR / F&I, or that
+// aggregates list price or MSRP into an inventory-value figure.
+const FINANCIAL_SQL = /gross|\bcost\b|\bpvr\b|\bmargin\b|\bprofit\b|fi_deals|(sum|avg|total)\s*\(\s*"?(list_price|msrp|cost)/i;
+const RESTRICTED_MSG = "I can't share store financials (gross, cost, inventory value) on your login — check with your manager. I can still pull inventory, leads, customers, follow-ups, or draft a text.";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -74,9 +81,10 @@ const TOOLS = [
   },
 ];
 
-async function runTool(name: string, input: any): Promise<string> {
+async function runTool(name: string, input: any, restricted = false): Promise<string> {
   try {
     if (name === "query_dms") {
+      if (restricted && FINANCIAL_SQL.test(String(input.sql || ""))) return "REFUSED: " + RESTRICTED_MSG;
       const rows = await dmsQuery(String(input.sql || ""));
       let out = JSON.stringify(rows);
       if (out.length > 9000) out = out.slice(0, 9000) + ` …(truncated; ${rows.length} rows — add a tighter LIMIT)`;
@@ -98,7 +106,7 @@ async function runTool(name: string, input: any): Promise<string> {
 // ---- No-key router: handle the common sales-desk questions with LIVE DMS queries
 // (and the voice-locked template drafter), so the assistant is useful without an LLM. ----
 const OPEN = "lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market')";
-async function routedLookup(question: string): Promise<string | null> {
+async function routedLookup(question: string, restricted = false): Promise<string | null> {
   const ql = question.toLowerCase();
 
   // DRAFT a customer message — voice-locked template. (whole-word name match)
@@ -128,6 +136,7 @@ async function routedLookup(question: string): Promise<string | null> {
     }
     // PACE / how am I doing this month.
     if (/\b(pace|this month|how.*doing|standing|mtd|my (units|gross|numbers|month)|where am i)\b/.test(ql)) {
+      if (restricted) return "Your month-to-date numbers are on your Sales Board. Store-wide and other-rep financials aren't available on your login.";
       const first = new Date().toISOString().slice(0, 8) + "01";
       const rows = await dmsQuery(`SELECT "NUO" AS nuo, COUNT(*) AS units, COALESCE(SUM("FRONT-GROSS"),0)::numeric(12,0) AS front, COALESCE(SUM("BACK-GROSS"),0)::numeric(12,0) AS back FROM sales_pace WHERE "S1-NUMBER" IN ('1249','3001249') AND "DATE" >= '${first}' GROUP BY "NUO"`);
       const u = rows.reduce((n: number, r: any) => n + Number(r.units || 0), 0);
@@ -141,7 +150,7 @@ async function routedLookup(question: string): Promise<string | null> {
       const inv = localInventorySearch(stock);
       if (inv.length) { const u: any = inv[0]; return `Stock ${u.stock}: ${u.vehicle}, ${u.color}, ${u.price ? money(u.price) : "price n/a"}, ${u.age_days}d on lot, ${u.status}. VIN ${u.vin}.`; }
       const sold = await dmsQuery(`SELECT customer, sold_date, total_gross FROM scorecard_sales WHERE POSITION('${stock}' IN COALESCE(stock_number,'')) > 0 LIMIT 3`);
-      if (sold.length) return `Stock ${stock} — sold deal(s):\n` + sold.map((s: any) => `• ${s.customer}, ${(s.sold_date || "").slice(0, 10)}, gross ${money(Number(s.total_gross || 0))}`).join("\n");
+      if (sold.length) return `Stock ${stock} — sold deal(s):\n` + sold.map((s: any) => `• ${s.customer}, ${(s.sold_date || "").slice(0, 10)}${restricted ? "" : `, gross ${money(Number(s.total_gross || 0))}`}`).join("\n");
     }
   } catch (e: any) { return `DMS lookup failed: ${e.message}`; }
 
@@ -157,10 +166,13 @@ export async function POST(req: NextRequest) {
   const history: { role: string; text: string }[] = Array.isArray(body.history) ? body.history : [];
   if (!question) return NextResponse.json({ answer: "Ask me anything — deals, leads, inventory, a customer, or 'draft a text to …'." });
 
+  // A salesperson login (not admin/manager) may not pull store financials through COVE.
+  const restricted = !(currentUser()?.seesFinancials);
+
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     // No LLM — route to live DMS for the common questions; tell Bailey how to unlock full chat.
-    const ans = await routedLookup(question);
+    const ans = await routedLookup(question, restricted);
     const tip = "\n\n— (Basic mode. For full back-and-forth like Cowork, add an ANTHROPIC_API_KEY: ./scripts/set-api-key.sh sk-ant-…)";
     return NextResponse.json({ answer: (ans || "I can pull follow-ups, your pace, a stock #, a customer, inventory, or draft a text. Try one of those.") + tip, source: "lookup" });
   }
@@ -174,7 +186,10 @@ export async function POST(req: NextRequest) {
       ...history.slice(-8).map((m) => ({ role: m.role === "you" ? "user" : "assistant", content: m.text })),
       { role: "user", content: question },
     ];
-    const system = SYSTEM + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot();
+    const policy = restricted
+      ? "\n\nACCESS LEVEL — RESTRICTED (salesperson, no financial access): NEVER reveal store financials — total/front/back gross, F&I, PVR, vehicle cost, margin, or aggregate inventory value/worth — and never another rep's numbers. You MAY give inventory availability (stock #, color, trim, age, status, a single unit's list price), lead/customer info, follow-ups, and message drafts. If asked for a hidden number, reply exactly: \"" + RESTRICTED_MSG + "\" The query tool will also refuse financial columns."
+      : "";
+    const system = SYSTEM + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot();
 
     // Agentic tool-use loop.
     for (let i = 0; i < 6; i++) {
@@ -186,7 +201,7 @@ export async function POST(req: NextRequest) {
       }
       messages.push({ role: "assistant", content: resp.content });
       const results = [];
-      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input) });
+      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input, restricted) });
       messages.push({ role: "user", content: results });
     }
     return NextResponse.json({ answer: "That took too many steps — try narrowing the question.", source: "ai" });

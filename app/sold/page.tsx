@@ -8,7 +8,7 @@ import SoldList from "./SoldList";
 export const dynamic = "force-dynamic";
 
 export default function SoldPage() {
-  if (!currentUser()?.isAdmin) redirect("/");
+  if (!currentUser()?.seesFinancials) redirect("/");
   const { deals, totalGross, asOf } = getSold();
   const n = deals.length;
   const avg = n ? Math.round(totalGross / n) : 0;

@@ -7,7 +7,7 @@ import { Car, DollarSign, Star, PieChart, ClipboardList, CalendarDays, Lightbulb
 export const dynamic = "force-dynamic";
 
 export default function MetricsPage() {
-  if (!currentUser()?.isAdmin) redirect("/");
+  if (!currentUser()?.seesFinancials) redirect("/");
   const months = getMetrics();
   const deals = getDeals();
 

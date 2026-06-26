@@ -97,6 +97,21 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D16 — Role-based financial visibility: admin / manager / salesman (2026-06-26)
+Bailey wants some salesmen NOT to see store financials (esp. inventory worth). Added a **manager**
+tier (`User.manager`); `elevated()` = admin OR manager = "seesFinancials". `currentUser()` now
+returns `seesFinancials`. Cut lines he chose: hide **inventory value/worth** and **store gross + PVR**
+from salesmen; **keep** their own numbers, the leaderboard, and per-deal gross/list prices.
+Implementation — most surfaces were already admin-only (so salesmen already couldn't reach /metrics,
+/sold, /pipeline, /customers, /health, /outreach, or COVE chat). Changes: (a) widened the dashboard
+full-board branch + /metrics + /sold + the COVE widget from `isAdmin` to `seesFinancials` so MANAGERS
+get them too; (b) the one real salesman-visible leak — the **"Inventory value" tile on /inventory** —
+is now `seesFinancials`-only, replaced by an "Avg days on lot" tile for salesmen; (c) COVE API
+defense-in-depth: a restricted caller gets a financial-SQL guard (blocks gross/cost/PVR/fi_deals/
+SUM(list_price)) + a system-prompt policy + guarded no-key routes. Promote/demote via
+`node scripts/set-role.mjs "<name>" manager|salesman`. *Revisit-if:* you want managers to also get the
+admin tools (outreach/health), or salesmen to lose their own gross too.
+
 ### D15 — Add-contact override on AI Outreach (2026-06-25)
 When a target has no phone/email (not in the lead, not in the 35k contacts index), Bailey can now
 **type one right on the Outreach page**. Saved to `data/contact-overrides.json`, keyed by a

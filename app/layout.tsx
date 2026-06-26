@@ -7,7 +7,7 @@ import PushSetup from "./components/PushSetup";
 import ThemeProvider from "./components/ThemeProvider";
 import AskWidget from "./components/AskWidget";
 import { getProfile } from "./lib/data";
-import { readSession, COOKIE, getUserBySlug } from "./lib/auth";
+import { readSession, COOKIE, getUserBySlug, elevated } from "./lib/auth";
 
 export const metadata: Metadata = {
   title: "COVE — Your AI Sales Assistant",
@@ -46,20 +46,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  const isAdmin = !!getUserBySlug(session.slug)?.isAdmin;
+  const u = getUserBySlug(session.slug);
+  const isAdmin = !!u?.isAdmin;
+  const seesFinancials = elevated(u);
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
           <div className="app">
-            <Sidebar name={session.name} title="Covert Auto Group — Hutto" isAdmin={isAdmin} />
+            <Sidebar name={session.name} title="Covert Auto Group — Hutto" isAdmin={isAdmin} seesFinancials={seesFinancials} />
             <main className="main">
               <AutoRefresh lastSync={p.lastSync} />
               <PushSetup vapidPublic={process.env.NEXT_PUBLIC_VAPID_PUBLIC || ""} />
               {children}
             </main>
           </div>
-          {isAdmin && <AskWidget />}
+          {seesFinancials && <AskWidget />}
         </ThemeProvider>
       </body>
     </html>

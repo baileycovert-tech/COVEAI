@@ -98,8 +98,8 @@ export default function Dashboard() {
 
   const myLeads = me ? getLeadFeed(me.slug) : [];
 
-  // ---------- NON-ADMIN: that rep's own board ----------
-  if (me && !me.isAdmin) {
+  // ---------- SALESMAN (no financial access): that rep's own board only ----------
+  if (me && !me.seesFinancials) {
     const b = reps.bySlug?.[me.slug];
     const gross = b?.gross ?? 0;
     return (

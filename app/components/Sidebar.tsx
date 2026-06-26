@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
-type NavItem = { href: string; label: string; Icon: any; admin?: boolean };
+// admin:true → owner-only tools. fin:true → financial pages (admins + managers).
+type NavItem = { href: string; label: string; Icon: any; admin?: boolean; fin?: boolean };
 type NavSection = { section: string };
 type NavEntry = NavItem | NavSection;
 
@@ -17,17 +18,21 @@ const NAV: NavEntry[] = [
   { href: "/leads/new", label: "Add Lead", Icon: UserPlus },
   { href: "/pipeline", label: "Pipeline", Icon: KanbanSquare, admin: true },
   { href: "/customers", label: "Customers", Icon: Users, admin: true },
-  { href: "/sold", label: "Sold", Icon: Receipt, admin: true },
+  { href: "/sold", label: "Sold", Icon: Receipt, fin: true },
   { href: "/outreach", label: "AI Outreach", Icon: Sparkles, admin: true },
   { section: "Know" },
   { href: "/inventory", label: "Inventory", Icon: Car },
-  { href: "/metrics", label: "Metrics", Icon: TrendingUp, admin: true },
+  { href: "/metrics", label: "Metrics", Icon: TrendingUp, fin: true },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
 ];
 
-export default function Sidebar({ name, title, isAdmin }: { name: string; title: string; isAdmin?: boolean }) {
+export default function Sidebar({ name, title, isAdmin, seesFinancials }: { name: string; title: string; isAdmin?: boolean; seesFinancials?: boolean }) {
   const path = usePathname();
-  const items = NAV.filter((n) => !("admin" in n && n.admin) || isAdmin);
+  const items = NAV.filter((n) => {
+    if ("admin" in n && n.admin) return isAdmin;
+    if ("fin" in n && n.fin) return seesFinancials;
+    return true;
+  });
   return (
     <aside className="sidebar">
       <div className="brand">

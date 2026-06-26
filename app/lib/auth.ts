@@ -8,7 +8,13 @@ const DATA = path.join(process.cwd(), "data");
 export type User = {
   slug: string; name: string; fordS1: string | null; chevyS1: string | null;
   hashes: string[]; isAdmin?: boolean;
+  // Managers see all financial numbers (store gross, PVR, inventory value) like an
+  // admin, but don't get the admin-only tools. Salesmen (neither flag) are restricted.
+  manager?: boolean;
 };
+
+// Elevated = can see store financials. Admin OR manager.
+export const elevated = (u?: User | null) => !!(u && (u.isAdmin || u.manager));
 
 function readUsers(): User[] {
   try { return JSON.parse(fs.readFileSync(path.join(DATA, "users.json"), "utf8")); }
@@ -50,11 +56,11 @@ export function getUserBySlug(slug: string): User | null {
 }
 
 // Server-component helper: the logged-in rep (or null). Reads the request cookie.
-export function currentUser(): { slug: string; name: string; isAdmin: boolean } | null {
+export function currentUser(): { slug: string; name: string; isAdmin: boolean; seesFinancials: boolean } | null {
   const s = readSession(cookies().get(COOKIE)?.value);
   if (!s) return null;
   const u = getUserBySlug(s.slug);
-  return { slug: s.slug, name: s.name, isAdmin: !!(u && u.isAdmin) };
+  return { slug: s.slug, name: s.name, isAdmin: !!(u && u.isAdmin), seesFinancials: elevated(u) };
 }
 
 // ---- signed session cookie: payload.signature ----
