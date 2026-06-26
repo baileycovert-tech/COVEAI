@@ -6,6 +6,7 @@ import AutoRefresh from "./components/AutoRefresh";
 import PushSetup from "./components/PushSetup";
 import ThemeProvider from "./components/ThemeProvider";
 import AskWidget from "./components/AskWidget";
+import MobileChrome from "./components/MobileChrome";
 import { getProfile } from "./lib/data";
 import { readSession, COOKIE, getUserBySlug, elevated } from "./lib/auth";
 
@@ -29,6 +30,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover", // let content extend under the notch/home bar; we pad with safe-area insets
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -55,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <div className="app">
             <Sidebar name={session.name} title="Covert Auto Group — Hutto" isAdmin={isAdmin} seesFinancials={seesFinancials} />
+            <MobileChrome name={session.name} isAdmin={isAdmin} seesFinancials={seesFinancials} />
             <main className="main">
               <AutoRefresh lastSync={p.lastSync} />
               <PushSetup vapidPublic={process.env.NEXT_PUBLIC_VAPID_PUBLIC || ""} />

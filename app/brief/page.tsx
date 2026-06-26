@@ -83,19 +83,21 @@ export default function BriefPage() {
         {needsTouch.length === 0 ? (
           <div className="empty">Caught up — no open leads waiting.</div>
         ) : (
-          <table>
-            <thead><tr><th>Customer</th><th>Vehicle</th><th>Next step</th><th></th></tr></thead>
-            <tbody>
-              {needsTouch.map((l, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 600 }}>{l.name}</td>
-                  <td>{l.vehicle || <span className="muted">—</span>}</td>
-                  <td><span className="muted" style={{ fontSize: 12 }}>{l.note || "Make first contact"}</span></td>
-                  <td className="num">{l.phone ? <a className="card-link" href={`/outreach?slug=${encodeURIComponent((l as any).slug || "")}`}>Draft</a> : null}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead><tr><th>Customer</th><th>Vehicle</th><th className="hide-sm">Next step</th><th></th></tr></thead>
+              <tbody>
+                {needsTouch.map((l, i) => (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 600 }}>{l.name}</td>
+                    <td>{l.vehicle || <span className="muted">—</span>}</td>
+                    <td className="hide-sm"><span className="muted" style={{ fontSize: 12 }}>{l.note || "Make first contact"}</span></td>
+                    <td className="num">{l.phone ? <a className="card-link" href={`/outreach?slug=${encodeURIComponent((l as any).slug || "")}`}>Draft</a> : null}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
