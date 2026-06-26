@@ -95,6 +95,35 @@ export const getThreadForCustomer = (c: { slug: string; name?: string; phone?: s
   return [] as ThreadMsg[];
 };
 
+// Morning-brief signals: the latest INBOUND message per thread, recent first. A thread is
+// "waiting" if the customer sent the last message (Bailey owes a reply) and "moving" if that
+// message shows buying intent (price/financing/trade/test-drive/a question) — manual §3.
+export type BriefSignal = { name: string; slug: string; at: string; text: string; channel: string; waiting: boolean; moving: boolean };
+const MOVING_RE = /\?|\bprice\b|financ|payment|trade|test ?drive|come (in|by)|how much|interested|when can|available|still (have|there|in)/i;
+export function getBriefSignals(maxAgeDays = 7, limit = 12): BriefSignal[] {
+  const threads = read<Record<string, (ThreadMsg & { channel?: string })[]>>("imessage-threads.json", {});
+  const nameBySlug: Record<string, string> = {};
+  for (const c of getCustomers()) nameBySlug[c.slug] = c.name;
+  for (const t of getTextLeads()) nameBySlug[t.slug] ||= t.name;
+  const cutoff = Date.now() - maxAgeDays * 86400000;
+  const out: BriefSignal[] = [];
+  for (const [slug, msgs] of Object.entries(threads)) {
+    const inbound = (msgs || []).filter((m) => m.dir === "in");
+    if (!inbound.length) continue;
+    const lastIn = inbound[inbound.length - 1];
+    const at = lastIn.at || "";
+    if (at && new Date(at).getTime() < cutoff) continue;
+    out.push({
+      name: nameBySlug[slug] || slug.replace(/^(imsg|gmail|vs)-/, ""),
+      slug, at, text: (lastIn.text || "").slice(0, 140),
+      channel: msgs.some((m) => m.channel === "email") ? "email" : "iMessage",
+      waiting: msgs[msgs.length - 1]?.dir === "in",
+      moving: MOVING_RE.test(lastIn.text || ""),
+    });
+  }
+  return out.sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, limit);
+}
+
 export type SoldDeal = {
   id: string; date: string; deal: number; customer: string; stock: string; vin: string;
   nuo: string; store: string; year: number | null; make: string | null; model: string | null;
