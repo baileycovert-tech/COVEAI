@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { lookupContact } from "./contacts";
+import { getOverride } from "./overrides";
 
 // Data lives in /data at the repo root and is read at request time so a sync
 // (or a hand edit) is reflected on the next page load — that's the "live" part.
@@ -143,9 +144,16 @@ export function getOutreachTargets(repSlug = "bailey-covert"): Customer[] {
       hot: !!l.urgent,
     });
   }
-  // Fill in any missing phone/email from Bailey's 35k contacts index (contacts.db).
+  // Resolve contact info, highest-trust first:
+  //  1) a manual override Bailey typed on the Outreach page (contact-overrides.json)
+  //  2) his 35k contacts index (contacts.db)
   const all = [...leadTargets, ...customers];
   for (const c of all) {
+    const ov = getOverride(c.name);
+    if (ov) {
+      if (ov.phone) c.phone = ov.phone;
+      if (ov.email) c.email = ov.email;
+    }
     if (c.phone && c.email) continue;
     const hit = lookupContact(c.name, c.phone);
     if (hit) {

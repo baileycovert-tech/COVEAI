@@ -97,6 +97,16 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D15 — Add-contact override on AI Outreach (2026-06-25)
+When a target has no phone/email (not in the lead, not in the 35k contacts index), Bailey can now
+**type one right on the Outreach page**. Saved to `data/contact-overrides.json`, keyed by a
+normalized **name** (survives the nightly `build-crm` rebuild, which regenerates lead slugs but not
+names). Priority order in `getOutreachTargets` + the send route: **manual override → contacts.db →
+blank**. Validation: phone normalized to 10 digits → `(xxx) xxx-xxxx`, email basic-shape check; bad
+input 400s. Admin-only API `POST /api/outreach/contact`. The chip auto-flips to "on file" and Send
+unlocks without a reload. *Revisit-if:* you want overrides written back to the real customer wiki
+record instead of a side file (would need the wiki to be writable from the app).
+
 ### D14 — P2 store-location filter = stock-prefix lot map (single rooftop) (2026-06-25)
 The /inventory book the app holds is the **Hutto rooftop** (Covert Ford Chevrolet Hutto). There's
 no rooftop column in the data, so "store location" is derived from the **stock-number prefix**,

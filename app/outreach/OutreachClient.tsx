@@ -14,6 +14,7 @@ export default function OutreachClient({
   customers: Cust[]; initialQueue: Draft[]; aiEnabled: boolean; preselect: string;
 }) {
   const [queue, setQueue] = useState<Draft[]>(initialQueue);
+  const [custList, setCustList] = useState<Cust[]>(customers);
   const [slug, setSlug] = useState(preselect || customers[0]?.slug || "");
   const [channel, setChannel] = useState<"text" | "email">("text");
   const [intent, setIntent] = useState("");
@@ -22,8 +23,13 @@ export default function OutreachClient({
   const [sendingId, setSendingId] = useState("");
   const [errorById, setErrorById] = useState<Record<string, string>>({});
 
-  const selected = customers.find((c) => c.slug === slug);
-  const custBySlug = (s: string) => customers.find((c) => c.slug === s);
+  const selected = custList.find((c) => c.slug === slug);
+  const custBySlug = (s: string) => custList.find((c) => c.slug === s);
+
+  // Reflect a just-saved phone/email into every matching target (by name).
+  function applyContact(name: string, has: { hasPhone: boolean; hasEmail: boolean }) {
+    setCustList((list) => list.map((c) => (c.name === name ? { ...c, ...has } : c)));
+  }
 
   // Block generating a channel the customer has no contact info for.
   const canText = selected?.hasPhone;
@@ -117,10 +123,19 @@ export default function OutreachClient({
 
           <label className="stat-label">Customer</label>
           <select className="field mt-sm" value={slug} onChange={(e) => setSlug(e.target.value)}>
-            {customers.map((c) => (
+            {custList.map((c) => (
               <option key={c.slug} value={c.slug}>{c.hot ? "" : ""}{c.name}{c.vehicle ? ` — ${c.vehicle}` : ""}</option>
             ))}
           </select>
+
+          {selected && (
+            <AddContact
+              name={selected.name}
+              hasPhone={selected.hasPhone}
+              hasEmail={selected.hasEmail}
+              onSaved={(has) => applyContact(selected.name, has)}
+            />
+          )}
 
           {selected?.next && (
             <div className="callout mt" style={{ fontSize: 12.5 }}>
@@ -199,6 +214,7 @@ export default function OutreachClient({
               return (
                 <DraftCard key={d.id} d={d} approvedView
                   canSend={!!canSend} sending={sendingId === d.id} error={errorById[d.id]}
+                  cust={c} onContactSaved={(has) => c && applyContact(c.name, has)}
                   onSend={() => sendNow(d.id)}
                   onDismiss={() => remove(d.id)} onCopy={() => copy(d)} copied={copiedId === d.id} />
               );
@@ -227,13 +243,93 @@ export default function OutreachClient({
   );
 }
 
+// Inline "add a phone / email" form for a target that's missing contact info
+// (or to correct what the contacts index guessed). Saves to contact-overrides.json.
+function AddContact({
+  name, hasPhone, hasEmail, onSaved, compact,
+}: {
+  name: string; hasPhone: boolean; hasEmail: boolean;
+  onSaved: (has: { hasPhone: boolean; hasEmail: boolean }) => void; compact?: boolean;
+}) {
+  const missing = !hasPhone || !hasEmail;
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [okMsg, setOkMsg] = useState("");
+
+  async function save() {
+    setBusy(true); setErr(""); setOkMsg("");
+    try {
+      const payload: any = { name };
+      if (phone.trim()) payload.phone = phone.trim();
+      if (email.trim()) payload.email = email.trim();
+      if (!payload.phone && !payload.email) { setErr("Enter a phone number or an email."); return; }
+      const r = await fetch("/api/outreach/contact", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await r.json();
+      if (!data.ok) { setErr(data.error || "Couldn't save."); return; }
+      onSaved({ hasPhone: data.hasPhone, hasEmail: data.hasEmail });
+      setOkMsg("Saved ✓"); setPhone(""); setEmail("");
+      setTimeout(() => { setOkMsg(""); setOpen(false); }, 1200);
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const expanded = open || missing;
+
+  return (
+    <div className={compact ? "mt-sm" : "callout mt"} style={{ fontSize: 12.5 }}>
+      <div className="flex between" style={{ alignItems: "center" }}>
+        <span className={missing ? "" : "muted"}>
+          {hasPhone ? "📱 Phone on file" : "📱 No phone"} · {hasEmail ? "✉️ Email on file" : "✉️ No email"}
+        </span>
+        {!missing && (
+          <button className="btn sm ghost" onClick={() => setOpen((o) => !o)}>{open ? "Close" : "Edit contact"}</button>
+        )}
+      </div>
+      {expanded && (
+        <div className="mt-sm">
+          {!hasPhone && (
+            <input className="field" style={{ marginBottom: 6 }} inputMode="tel" placeholder="Phone — e.g. (512) 555-0134"
+              value={phone} onChange={(e) => setPhone(e.target.value)} />
+          )}
+          {!hasEmail && (
+            <input className="field" style={{ marginBottom: 6 }} inputMode="email" placeholder="Email — e.g. name@email.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+          )}
+          {hasPhone && hasEmail && open && (
+            <>
+              <input className="field" style={{ marginBottom: 6 }} inputMode="tel" placeholder="New phone (overwrites)"
+                value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="field" style={{ marginBottom: 6 }} inputMode="email" placeholder="New email (overwrites)"
+                value={email} onChange={(e) => setEmail(e.target.value)} />
+            </>
+          )}
+          <div className="flex gap-sm" style={{ alignItems: "center" }}>
+            <button className="btn primary sm" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save contact"}</button>
+            {okMsg && <span style={{ color: "var(--green)" }}>{okMsg}</span>}
+            {err && <span style={{ color: "var(--red)" }}>{err}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DraftCard({
   d, onApprove, onSave, onDismiss, onCopy, onSend, copied, approvedView,
-  canSend, sending, error,
+  canSend, sending, error, cust, onContactSaved,
 }: {
   d: Draft; onApprove?: () => void; onSave?: (body: string, subject?: string) => void;
   onDismiss: () => void; onCopy: () => void; onSend?: () => void; copied: boolean; approvedView?: boolean;
   canSend?: boolean; sending?: boolean; error?: string;
+  cust?: Cust; onContactSaved?: (has: { hasPhone: boolean; hasEmail: boolean }) => void;
 }) {
   const [edit, setEdit] = useState(false);
   const [body, setBody] = useState(d.body);
@@ -279,10 +375,15 @@ function DraftCard({
         <button className="btn sm ghost" style={{ marginLeft: "auto", color: "var(--red)" }} onClick={onDismiss}>Dismiss</button>
       </div>
       {error && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 10 }}>{error}</div>}
-      {approvedView && !canSend && !error && (
-        <div className="stat-sub" style={{ color: "var(--amber)", marginTop: 10 }}>
-          No {d.channel === "email" ? "email" : "phone number"} on file — add one to the customer record to enable sending.
-        </div>
+      {approvedView && !canSend && (
+        <>
+          <div className="stat-sub" style={{ color: "var(--amber)", marginTop: 10 }}>
+            No {d.channel === "email" ? "email" : "phone number"} on file for this {d.channel === "email" ? "email" : "text"}. Add it below, then send.
+          </div>
+          {cust && onContactSaved && (
+            <AddContact name={cust.name} hasPhone={cust.hasPhone} hasEmail={cust.hasEmail} onSaved={onContactSaved} compact />
+          )}
+        </>
       )}
     </div>
   );

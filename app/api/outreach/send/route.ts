@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { getOutreachQueue, getOutreachTargets, writeData } from "../../../lib/data";
 import { lookupContact } from "../../../lib/contacts";
+import { getOverride } from "../../../lib/overrides";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,12 @@ export async function POST(req: NextRequest) {
   // getOutreachTargets already enriches phone/email from the 35k contacts index.
   const customer = getOutreachTargets().find((c) => c.slug === draft.slug);
   let recipient = draft.channel === "email" ? customer?.email : customer?.phone;
-  // Last-ditch: look the contact up directly (covers a draft made before enrichment).
+  // Last-ditch: a manual override Bailey typed, then the contacts index
+  // (covers a draft made before enrichment).
+  if (!recipient) {
+    const ov = getOverride(customer?.name || draft.customer);
+    recipient = draft.channel === "email" ? ov?.email || undefined : ov?.phone || undefined;
+  }
   if (!recipient) {
     const hit = lookupContact(customer?.name || draft.customer, customer?.phone);
     recipient = draft.channel === "email" ? hit?.email : hit?.phone;
