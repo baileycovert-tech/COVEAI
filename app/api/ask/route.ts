@@ -26,7 +26,7 @@ function localInventorySearch(query: string) {
     const hay = `${u.stock} ${u.vin} ${u.year} ${u.make || ""} ${u.model} ${u.trim} ${u.ext} ${u.int} ${u.store} ${u.condition || ""} ${u.status}`.toLowerCase();
     return terms.every((t) => hay.includes(t) || (t.endsWith("s") && hay.includes(t.slice(0, -1))));
   });
-  return hit.slice(0, 25).map((u) => ({ stock: u.stock, vin: u.vin, vehicle: `${u.year} ${u.store === "Used" && u.make ? u.make + " " : ""}${u.model} ${u.trim || ""}`.replace(/\s+/g, " ").trim(), color: u.ext && !/^nan$/i.test(u.ext) ? u.ext : "", interior: u.int, price: u.price, mileage: u.mileage, age_days: u.age, status: u.status, store: u.store }));
+  return hit.slice(0, 25).map((u) => ({ stock: u.stock, vin: u.vin, vehicle: `${u.year} ${u.store === "Used" && u.make ? u.make + " " : ""}${u.model} ${u.trim || ""}`.replace(/\s+/g, " ").trim(), color: u.ext && !/^nan$/i.test(u.ext) ? u.ext : "", interior: u.int, internet_price: u.internet ?? u.price, list_price: u.price, mileage: u.mileage, age_days: u.age, status: u.status, store: u.store }));
 }
 
 function crmSnapshot() {

@@ -57,7 +57,7 @@ export const getLeaderboard = () => read("leaderboard.json", { rows: [] as Leade
 export const getCustomers = () => read<Customer[]>("customers.json", []);
 export const getPipeline = () => read<Pipeline>("pipeline.json", { last_refresh: "", standing: "", columns: [] });
 export const getInventory = () => read("inventory.json", { asOf: "", ford: [] as InvModel[], chevy: [] as InvModel[] } as any);
-export type InvUnit = { stock: string; vin: string; year: number; make?: string; model: string; trim: string; ext: string; int: string; price: number | null; mileage?: number | null; age: number; status: string; store: string; condition?: string };
+export type InvUnit = { stock: string; vin: string; year: number; make?: string; model: string; trim: string; ext: string; int: string; price: number | null; internet?: number | null; mileage?: number | null; age: number; status: string; store: string; condition?: string };
 export const getInventoryUnits = () =>
   read<{ asOf: string; source: string; units: InvUnit[] }>("inventory-units.json", { asOf: "", source: "", units: [] });
 export const getOutreachQueue = () => read<OutreachDraft[]>("outreach-queue.json", []);

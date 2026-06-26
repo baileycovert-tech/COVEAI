@@ -159,7 +159,7 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
       <div style={{ overflowX: "auto" }}>
         <table>
           <thead>
-            <tr><th>Stock</th><th>Vehicle</th><th>Color</th><th className="num">List</th><th className="num">Age</th><th>Status</th><th>VIN</th></tr>
+            <tr><th>Stock</th><th>Vehicle</th><th>Color</th><th className="num">Internet</th><th className="num hide-sm">List</th><th className="num">Age</th><th className="hide-sm">Status</th><th className="hide-sm">VIN</th></tr>
           </thead>
           <tbody>
             {filtered.slice(0, limit).map((u) => (
@@ -171,10 +171,11 @@ export default function InventorySearch({ units }: { units: InvUnit[] }) {
                   {u.mileage ? <span className="muted" style={{ fontSize: 11 }}> · {Math.round(u.mileage / 1000)}k mi</span> : null}
                 </td>
                 <td>{titleCase(u.ext) || "—"}{titleCase(u.int) ? <span className="muted" style={{ fontSize: 11 }}> / {titleCase(u.int)}</span> : null}</td>
-                <td className="num">{money(u.price)}</td>
+                <td className="num" style={{ fontWeight: 700, color: "hsl(var(--primary))" }}>{money((u.internet && u.internet > 0) ? u.internet : (u.price || null))}</td>
+                <td className="num hide-sm"><span className="muted">{u.price ? money(u.price) : "—"}</span></td>
                 <td className="num">{u.age}d {u.age >= 120 ? <span className="badge aged" style={{ marginLeft: 4 }}>aged</span> : u.age <= 14 ? <span className="badge green" style={{ marginLeft: 4 }}>new</span> : null}</td>
-                <td><span className="muted" style={{ fontSize: 11 }}>{u.status}</span></td>
-                <td><span className="muted" style={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{u.vin?.slice(-8)}</span></td>
+                <td className="hide-sm"><span className="muted" style={{ fontSize: 11 }}>{u.status}</span></td>
+                <td className="hide-sm"><span className="muted" style={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{u.vin?.slice(-8)}</span></td>
               </tr>
             ))}
           </tbody>

@@ -64,13 +64,17 @@ async function main() {
   try {
     const cols = `stock_number AS s, vin AS v, year AS y, COALESCE(standardized_model, model) AS m,
                   COALESCE(standardized_trim, trim) AS t, exterior_color AS c, interior_color AS ic,
-                  CASE WHEN list_price='NaN'::numeric THEN NULL ELSE list_price END AS p, age AS a, status AS st`;
+                  CASE WHEN list_price='NaN'::numeric THEN NULL ELSE list_price END AS p,
+                  CASE WHEN internet_price='NaN'::numeric THEN NULL ELSE internet_price END AS ip,
+                  age AS a, status AS st`;
     const avail = `status IN ('IN-STOCK','LOANER','RET LOANER','DEMO')`;
     const ford = await q(`SELECT ${cols} FROM ford_inventory_current WHERE ${avail}`);
     const chevy = await q(`SELECT ${cols} FROM chevy_inventory_current WHERE ${avail}`);
     const map = (rows, store) => rows.map((r) => ({
       stock: r.s, vin: r.v, year: r.y, make: store, model: r.m, trim: r.t, ext: r.c, int: r.ic,
-      price: num(r.p) != null ? Math.round(r.p) : null, mileage: null, age: r.a, status: r.st, store, condition: "New",
+      price: num(r.p) != null ? Math.round(r.p) : null,
+      internet: num(r.ip) != null ? Math.round(r.ip) : null, // advertised online price
+      mileage: null, age: r.a, status: r.st, store, condition: "New",
     })).filter((u) => u.stock);
 
     // USED inventory — ALL makes (trade-ins, off-brand), available only.
@@ -86,6 +90,7 @@ async function main() {
       stock: r.s, vin: r.v, year: r.y, make: r.mk, model: r.m,
       trim: /certified/i.test(r.cert || "") ? `${r.t || ""} (Certified)`.trim() : r.t,
       ext: r.c, int: r.ic, price: num(r.p) != null ? Math.round(r.p) : null,
+      internet: num(r.p) != null ? Math.round(r.p) : null, // used asking price = its internet price
       mileage: num(r.mi), age: r.a, status: r.st, store: "Used", condition: "Used",
     })).filter((u) => u.stock);
 
