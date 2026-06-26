@@ -37,8 +37,16 @@ const markSeen = db.prepare("INSERT OR IGNORE INTO seen(key,ts) VALUES(?,?)");
 
 // ---------- classifier ----------
 const VEHICLE = /\b(f-?150|f-?250|f-?350|super ?duty|silverado|sierra|tahoe|suburban|yukon|bronco|ranger|maverick|expedition|explorer|escape|equinox|traverse|colorado|corvette|camaro|mustang|wrangler|gladiator|jeep|ram|tundra|tacoma|4runner|truck|suv|sedan|car|vehicle|trade|king ranch|lariat|denali|raptor|z71|at4)\b/i;
-const BUY = /\b(price|pricing|how much|payment|otd|out the door|finance|financing|interest rate|apr|available|in stock|do you have|still (there|available)|test drive|come (in|by|look)|see it|when can i|looking (for|to)|want to (buy|see|look)|quote|monthly)\b/i;
+const BUY = /\b(price|pricing|how much|payment|otd|out the door|finance|financing|interest rate|apr|available|in stock|do you have|still (there|available)|test drive|come (in|by|look)|see it|when can i|looking (for|to)|want to (buy|see|look)|interested in|thinking about|in the market|shopping for|trade ?in|quote|monthly)\b/i;
 const SPAM = /(quince|reserve your|unsubscribe|opt-back|stop to opt|congratulations|you (have )?won|gift card|claim your|bit\.ly|tinyurl|snapchat\.com|sauna|perspire|verification code|do not share|did not request|confirmation #|opt-back into)/i;
+// iMessage tapback reactions ("Liked …", "Loved …") are not real messages.
+const TAPBACK = /^(Liked|Loved|Laughed at|Emphasized|Disliked|Questioned|Reacted)\b/i;
+// Only the vaguest words count as "generic" — a bare "car"/"vehicle" with no buy intent is
+// noise (e.g. "where are my car keys"). "trade"/"truck"/"suv" and any model stay real signals,
+// so a referral like "I've got a trade" is never dropped (recall > precision per Bailey).
+const GENERIC_VEH = /^(car|cars|sedan|sedans|vehicle|vehicles)$/i;
+// Bailey's own numbers — a self-text / outreach echo is never an inbound lead.
+const SELF_NUMBERS = new Set(["5127779404"]);
 // Bailey's own self-intercept SUMMARIES (not a single lead) — skip these.
 const isBrief = (t) => /(AM brief|morning brief|dead.?lead matchmaker|reactivations queued|JUNE MTD|Pace:\s*\d|Gap to \d)/i.test(t);
 const isInternalNote = (t) => /\b(self[- ]?test|automated test|send path works)\b/i.test(t);
@@ -77,7 +85,7 @@ function parseLeadAlert(t) {
 
 function classify(msg, customersByPhone) {
   const text = cleanText(msg.text);
-  if (!text || isInternalNote(text) || isBrief(text)) return { type: "internal" };
+  if (!text || isInternalNote(text) || isBrief(text) || TAPBACK.test(text)) return { type: "internal" };
   if (SPAM.test(text) || (msg.url && text.replace(msg.url, "").trim().length < 4)) return { type: "spam" };
 
   const alert = parseLeadAlert(text);
@@ -85,10 +93,16 @@ function classify(msg, customersByPhone) {
 
   // direct message from a real contact
   const senderPhone = phone10(msg.sender);
+  if (SELF_NUMBERS.has(senderPhone)) return { type: "internal" }; // Bailey texting himself / outreach echo
   const existing = customersByPhone[senderPhone];
-  const looksLikeLead = VEHICLE.test(text) || BUY.test(text);
-  if (existing) return { type: "followup", slug: existing.slug, name: existing.name, phone: senderPhone, text, hot: looksLikeLead };
-  if (looksLikeLead && senderPhone.length === 10) return { type: "lead", name: null, phone: senderPhone, vehicle: (text.match(VEHICLE) || [])[0], source: "iMessage", text };
+  const vehMatch = (text.match(VEHICLE) || [])[0];
+  const hasBuy = BUY.test(text);
+  // Known customer → always a follow-up; a vehicle/buy mention marks it hot.
+  if (existing) return { type: "followup", slug: existing.slug, name: existing.name, phone: senderPhone, text, hot: !!vehMatch || hasBuy };
+  // Unknown sender → only a NEW lead on a real signal: a specific model or buy intent.
+  // A bare generic word with no buy language is noise, not a lead.
+  const strongVeh = vehMatch && !GENERIC_VEH.test(vehMatch);
+  if ((strongVeh || hasBuy) && senderPhone.length === 10) return { type: "lead", name: null, phone: senderPhone, vehicle: strongVeh ? vehMatch : "", source: "iMessage", text };
   return { type: "other", phone: senderPhone, text };
 }
 

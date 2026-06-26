@@ -11,6 +11,7 @@
  */
 import Database from "better-sqlite3";
 import { execFileSync } from "child_process";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -52,9 +53,18 @@ const inbox = rows.map((r) => ({
   sender: r.sender || "unknown",
   is_from_me: false,
 }));
-import("fs").then((fs) => fs.writeFileSync(path.join(DATA, "_imessage-incoming.json"), JSON.stringify(inbox, null, 2) + "\n"));
-setMeta.run("last_rowid", String(rows[rows.length - 1].rowid));
-meta.close();
+// Write the inbox SYNCHRONOUSLY and confirm it landed BEFORE running ingest — otherwise
+// ingest races against a not-yet-written file and processes the stale inbox.
+fs.writeFileSync(path.join(DATA, "_imessage-incoming.json"), JSON.stringify(inbox, null, 2) + "\n");
 
-try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "imessage-ingest.mjs")], { encoding: "utf8", stdio: "inherit" }); } catch (e) { log("ingest err", e.message); }
-log(`tail: fed ${inbox.length} new messages (rowids ${rows[0].rowid}..${rows[rows.length - 1].rowid})`);
+// Advance the watermark ONLY after ingest succeeds, so a crash mid-ingest re-feeds these
+// next run instead of skipping them. (ingest's own per-row dedup makes the re-feed a no-op.)
+try {
+  execFileSync(process.execPath, [path.join(ROOT, "scripts", "imessage-ingest.mjs")], { encoding: "utf8", stdio: "inherit" });
+  setMeta.run("last_rowid", String(rows[rows.length - 1].rowid));
+  log(`tail: fed ${inbox.length} new messages (rowids ${rows[0].rowid}..${rows[rows.length - 1].rowid})`);
+} catch (e) {
+  log("ingest err — watermark NOT advanced, will retry next run:", e.message);
+} finally {
+  meta.close();
+}
