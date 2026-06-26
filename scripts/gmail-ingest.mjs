@@ -30,6 +30,9 @@ const nameOf = (from) => titleCase((String(from || "").replace(/<[^>]*>/, "").re
 // Automation/no-reply senders are never a "person" lead by themselves — but their BODY may carry a
 // parsed lead alert, which is handled before we ever look at the sender.
 const NOREPLY = /(no-?reply|do-?not-?reply|notification|mailer-daemon|postmaster)@/i;
+// Corporate bulk senders = daily noise (Bailey's operating manual §4). Never a customer lead.
+// parseLeadAlert still runs first, so a genuinely-forwarded vendor lead block is still captured.
+const NOISE_SENDERS = /@(stoneeagle|covertcity|barcoment|mx\.forduniversity|dealer\.gmfinancial)\.|^(reportscheduler|marketing\.emails|newsletter|do-?not-?reply|donotreply)@/i;
 
 const db = new Database(path.join(DATA, "poll.db"));
 db.exec("CREATE TABLE IF NOT EXISTS seen(key TEXT PRIMARY KEY, ts TEXT);");
@@ -51,7 +54,7 @@ function classify(mail, customersByEmail) {
   const vehMatch = (text.match(VEHICLE) || [])[0];
   const hasBuy = BUY.test(text);
   if (existing) return { type: "followup", slug: existing.slug, name: existing.name, email: from, text, hot: !!vehMatch || hasBuy };
-  if (NOREPLY.test(mail.from || "")) return { type: "other" }; // automated, no parseable lead
+  if (NOREPLY.test(mail.from || "") || NOISE_SENDERS.test(mail.from || "")) return { type: "other" }; // automated/bulk, no parseable lead
   const strongVeh = vehMatch && !GENERIC_VEH.test(vehMatch);
   if (strongVeh || hasBuy) return { type: "lead", name: nameOf(mail.from), phone: null, email: from, vehicle: strongVeh ? vehMatch : "", source: "Email", text };
   return { type: "other" };
