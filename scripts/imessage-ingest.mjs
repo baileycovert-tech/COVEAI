@@ -137,6 +137,7 @@ const status = { at: new Date().toISOString(), processed: inbox.length, newLeads
 write("imessage-status.json", status);
 db.close();
 
-// rebuild the connected pipeline so the new text-leads show on the board
-try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "build-crm.mjs")], { encoding: "utf8" }); } catch (e) { log("build-crm err", e.message); }
+// run the AI context pass (updates vehicle interest when a customer changes their
+// mind), which rebuilds the connected pipeline at the end.
+try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "enrich-context.mjs")], { encoding: "utf8" }); } catch (e) { log("enrich-context err", e.message); }
 log("imessage-ingest:", JSON.stringify(status));

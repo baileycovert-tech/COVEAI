@@ -97,6 +97,20 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D17 — Live context: vehicle interest follows the customer's mind (2026-06-26)
+Bug Bailey flagged: a customer who switched vehicles in a text ("scratch the F-150, the Tahoe")
+kept their OLD `vehicle_interest` — it was set once and frozen (build-crm only marked them hot,
+never re-read intent). Fix: `scripts/enrich-context.mjs` runs after every text pull; for each thread
+with NEW inbound messages (per-thread watermark in `poll.db` table `ctx_seen`, so the API is only
+hit on genuinely new messages), COVE (Claude `claude-sonnet-4-6`) reports the CURRENT vehicle and
+whether it changed. On a confident change it writes `data/context-overrides.json` (keyed by
+normalized name), which `build-crm` applies on top of everything → the profile, board, and
+`matchInventory()` all follow the switch, and a `↻ Switched to X (was Y)` note is added + the lead
+re-flagged hot. No key / API error → it skips the AI and still rebuilds (never stalls). Verified with
+an isolated F-150→Tahoe case (data snapshotted + restored). `imessage-ingest` now calls
+enrich-context instead of build-crm directly. *Revisit-if:* you want trade-in / budget / timing
+changes tracked the same way (same seam — extend the extractor's JSON).
+
 ### D16 — Role-based financial visibility: admin / manager / salesman (2026-06-26)
 Bailey wants some salesmen NOT to see store financials (esp. inventory worth). Added a **manager**
 tier (`User.manager`); `elevated()` = admin OR manager = "seesFinancials". `currentUser()` now

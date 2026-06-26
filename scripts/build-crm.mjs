@@ -134,6 +134,20 @@ for (const tl of textLeads) {
   });
 }
 
+// ---- apply live CONTEXT overrides (from enrich-context.mjs) ----
+// When a customer changes their mind in a text ("actually, the Tahoe"), COVE wrote
+// their CURRENT vehicle interest here. It wins over the first-captured interest, so
+// the profile, the board, and the inventory match all follow the change.
+const ctxOverrides = read("context-overrides.json", {});
+for (const c of customers) {
+  const ov = ctxOverrides[normName(c.name)];
+  if (ov && ov.vehicle_interest) {
+    if (ov.changed) { c.hot = true; c._stage = "hot"; } // a fresh switch is worth surfacing
+    c.vehicle_interest = ov.vehicle_interest;
+    if (ov.note) c.notes = `↻ ${ov.note}` + (c.notes ? `\n${c.notes}` : "");
+  }
+}
+
 // ---- pipeline columns (same people, grouped by live stage) ----
 const COLS = [
   { key: "hot", title: "Needs first contact", stages: ["hot"] },

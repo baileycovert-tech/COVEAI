@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default function SoldDetail({ params }: { params: { id: string } }) {
-  if (!currentUser()?.isAdmin) redirect("/");
+  if (!currentUser()?.seesFinancials) redirect("/");
   const d = getSold().deals.find((x) => x.id === params.id);
   if (!d) return (
     <div className="card"><div className="empty">Deal {params.id} not found. <Link className="card-link" href="/sold">← Back to Sold</Link></div></div>
