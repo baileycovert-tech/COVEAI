@@ -22,6 +22,7 @@ export default function OutreachClient({
   const [copiedId, setCopiedId] = useState("");
   const [sendingId, setSendingId] = useState("");
   const [errorById, setErrorById] = useState<Record<string, string>>({});
+  const [genErr, setGenErr] = useState("");
 
   const selected = custList.find((c) => c.slug === slug);
   const custBySlug = (s: string) => custList.find((c) => c.slug === s);
@@ -38,28 +39,37 @@ export default function OutreachClient({
   async function generate() {
     if (!slug) return;
     setBusy(true);
+    setGenErr("");
     try {
       const r = await fetch("/api/outreach/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, channel, intent }),
       });
+      if (!r.ok) { setGenErr(r.status === 401 ? "Session expired — sign in again." : `Couldn't generate (server error ${r.status}).`); return; }
       const data = await r.json();
-      if (data.draft) setQueue((q) => [data.draft, ...q]);
-      setIntent("");
+      if (data.draft) { setQueue((q) => [data.draft, ...q]); setIntent(""); }
+      else setGenErr(data.error || "No draft came back — try again.");
+    } catch {
+      setGenErr("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
 
   async function patch(id: string, fields: Partial<Draft>) {
-    const r = await fetch("/api/outreach/queue", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...fields }),
-    });
-    const data = await r.json();
-    if (data.draft) setQueue((q) => q.map((d) => (d.id === id ? data.draft : d)));
+    try {
+      const r = await fetch("/api/outreach/queue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...fields }),
+      });
+      if (!r.ok) { setErrorById((e) => ({ ...e, [id]: `Couldn't save (error ${r.status}) — try again.` })); return; }
+      const data = await r.json();
+      if (data.draft) setQueue((q) => q.map((d) => (d.id === id ? data.draft : d)));
+    } catch {
+      setErrorById((e) => ({ ...e, [id]: "Couldn't reach the server — try again." }));
+    }
   }
 
   async function sendNow(id: string) {
@@ -168,6 +178,7 @@ export default function OutreachClient({
           <button className="btn primary mt" style={{ width: "100%", justifyContent: "center" }} onClick={generate} disabled={busy || !slug}>
             {busy ? "Drafting…" : aiEnabled ? "Generate with Claude" : "Generate draft"}
           </button>
+          {genErr && <div className="stat-sub" style={{ color: "var(--red)", marginTop: 8 }}>{genErr}</div>}
         </div>
 
         {/* Counts */}

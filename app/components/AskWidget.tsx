@@ -51,10 +51,15 @@ export default function AskWidget() {
     setBusy(true);
     try {
       const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: text, history: priorHistory }) });
+      if (!r.ok) {
+        const text = r.status === 401 ? "Your session expired — sign in again to use COVE." : `COVE hit a server error (${r.status}). Try again in a moment.`;
+        setMsgs((m) => [...m, { role: "bot", text }]);
+        return;
+      }
       const d = await r.json();
       setMsgs((m) => [...m, { role: "bot", text: d.answer || "No answer.", source: d.source }]);
     } catch {
-      setMsgs((m) => [...m, { role: "bot", text: "Something went wrong reaching the data." }]);
+      setMsgs((m) => [...m, { role: "bot", text: "Couldn't reach COVE — check your connection and try again." }]);
     } finally {
       setBusy(false);
     }
