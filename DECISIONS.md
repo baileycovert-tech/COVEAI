@@ -97,6 +97,29 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D18 — Multi-channel lead ingestion: one parser, four sources (2026-06-26)
+"All my texts, gmails, and VinSolutions leads picked up, no misses." Extracted the lead vocabulary +
+`parseLeadAlert` into `scripts/lib-leads.mjs` (ONE source of truth) so every channel parses Bailey's
+formats identically. Added:
+- `gmail-ingest.mjs` — body-parser for forwarded/individual lead emails (700credit/Carfax style),
+  seam = `data/_gmail-incoming.json`. Tested (Marcus Webb vendor email + Jane Renner direct + spam filtered).
+- `gmail-csv-ingest.mjs` — **the real bulk Gmail path**: Bailey's leads arrive as CSV ATTACHMENTS
+  ("Daily lead dump" from `reportscheduler@motosnap.com`), NOT in the email body. Parses any CSV
+  dropped in `data/_gmail-csv/*.csv`, mapping columns by header keyword (name/first+last/phone/email/
+  vehicle/stock/source). Tested (quoted commas, split names, dedup by row hash). Note: `rob@covertcity.net`
+  "105 report" blasts are INTERNAL reports, not leads — ignored.
+- `vinsolutions-ingest.mjs` — pulls `vs_get_my_pipeline` from the VS MCP (`http://127.0.0.1:7892/mcp`),
+  maps to leads, fails gracefully (no wipe) when the bridge is down.
+- `build-crm.mjs` now unions imessage + gmail + gmail-csv + vinsolutions leads (with email backfill).
+
+**Two external dependencies remain for full autonomy (not code-fixable from here):**
+1. **Gmail CSV producer** — downloading the motosnap CSV attachment needs Gmail-attachment access; the
+   connected Gmail MCP only reads thread bodies (no getAttachment). Needs the Gmail API attachment scope
+   or Bailey dropping a CSV into `data/_gmail-csv/`. Parser is ready.
+2. **VinSolutions bridge** — its MCP server is on SDK `^1.0.4` vs the app's `^1.29` → "Server not
+   initialized" handshake skew (same family as the websites MCP); also needs Chrome + the VS extension +
+   VS login live. Ingest is ready; align the server SDK + open VS in Chrome to flip it on.
+
 ### D17 — Live context: vehicle interest follows the customer's mind (2026-06-26)
 Bug Bailey flagged: a customer who switched vehicles in a text ("scratch the F-150, the Tahoe")
 kept their OLD `vehicle_interest` — it was set once and frozen (build-crm only marked them hot,

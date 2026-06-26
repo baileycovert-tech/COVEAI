@@ -114,23 +114,31 @@ for (const wc of wikiFull) {
   customers.push({ ...wc, _stage: isHot ? "hot" : "working" });
 }
 
-// Union in iMessage text-leads (from imessage-ingest) — these can NEVER be dropped.
-// They land in "needs first contact" and carry their texted vehicle interest.
-const textLeads = read("imessage-leads.json", []);
-for (const tl of textLeads) {
+// Union in every direct channel — iMessage, Gmail, VinSolutions (from the *-ingest scripts).
+// These can NEVER be dropped; they land in "needs first contact" with their captured interest.
+const channelLeads = [
+  ...read("imessage-leads.json", []),
+  ...read("gmail-leads.json", []),
+  ...read("gmail-csv-leads.json", []),
+  ...read("vinsolutions-leads.json", []),
+];
+for (const tl of channelLeads) {
   const key = normName(tl.name || "");
   if (key && haveNames.has(key)) {
-    // already a known customer — just mark them hot from the fresh text
+    // already a known customer — mark hot and backfill any contact info we now have
     const c = customers.find((x) => normName(x.name) === key);
-    if (c) { c.hot = true; c._stage = "hot"; if (!c.phone && tl.phone) c.phone = tl.phone; }
+    if (c) { c.hot = true; c._stage = "hot"; if (!c.phone && tl.phone) c.phone = tl.phone; if (!c.email && tl.email) c.email = tl.email; }
     continue;
   }
   if (key) haveNames.add(key);
+  const ch = tl.channel || "iMessage";
   customers.push({
-    slug: tl.slug, name: tl.name, phone: tl.phone || null, email: null,
-    vehicle_interest: tl.vehicle || "vehicle TBD", trade: null, stage: "New text lead",
-    status: "active", last_touch: dateOnly(tl.at), next_step: "Reply to their text — make first contact",
-    personal: "", source: tl.source || "iMessage", notes: tl.lastMsg || "", hot: true, _stage: "hot",
+    slug: tl.slug, name: tl.name, phone: tl.phone || null, email: tl.email || null,
+    vehicle_interest: tl.vehicle || "vehicle TBD", trade: null,
+    stage: ch === "VinSolutions" ? "VinSolutions lead" : ch === "Gmail" ? "New email lead" : "New text lead",
+    status: "active", last_touch: dateOnly(tl.at),
+    next_step: ch === "Gmail" ? "Reply to their email — make first contact" : ch === "VinSolutions" ? "Work this VinSolutions lead — first contact" : "Reply to their text — make first contact",
+    personal: "", source: tl.source || ch, notes: tl.lastMsg || "", hot: true, _stage: "hot",
   });
 }
 
