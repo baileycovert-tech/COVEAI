@@ -1,7 +1,28 @@
-# STATUS — Covert CRM / COVE  (2026-06-25, latest session)
+# STATUS — Covert CRM / COVE  (2026-06-26, latest session)
 
 Open it: **http://localhost:4317** (Mac) · **https://covertai.coverthuttoauto.com** (phone).
 Start it: `cd "Covert Sales Assistant/covert-crm" && ./run.sh`
+
+## 🔎 Audit (2026-06-26) — ingestion + context
+- **Context bug FIXED & verified** — a customer who switches vehicles in a text now updates their
+  profile/board/matches (`scripts/enrich-context.mjs`, D17). Demo: F-150 → Tahoe propagated.
+- **Ingestion reality**: iMessage = built but was **stale since Jun 25** (no autonomous loop firing);
+  **Gmail = not built**; **VinSolutions = not wired** (its MCP `com.covert.vinsolutions-mcp` runs with
+  `vs_get_my_pipeline` etc. but no code consumes it); **DMS = 403**. So 3 of 4 sources aren't flowing.
+- **Unblocked**: `chat.db` is now READABLE (157k msgs — Full Disk Access landed) → autonomous text
+  capture via `imessage-tail.mjs` is finally possible.
+- **Role gating** added (D16): managers/admins see financials; salesmen don't see inventory worth or
+  store gross. `node scripts/set-role.mjs "<name>" manager`.
+- **Autonomous text capture INSTALLED** — `com.covert.crm-imessage` launchd job (every 2 min,
+  `scripts/install-imessage-tail.sh`). ⚠️ **ACTION NEEDED**: grant Full Disk Access to
+  `/usr/local/bin/node` (System Settings → Privacy & Security → Full Disk Access → + → that path),
+  else the job skips with "chat.db not readable". App also re-anchored under launchd (survives reboot).
+- **Catch-up ran** (Jun 26): pulled ~3 days of texts → 5 real text-leads + follow-ups; context pass
+  extracted Jason→Corvette, Shay→F-350, Zoe→RAV4. Fixed a real miss-path (async inbox-write race in
+  imessage-tail) + added noise filters (self#, tapbacks, generic "car keys").
+- Pending build order: (3) wire VinSolutions (MCP `vs_get_my_pipeline` ready), (4) wire Gmail.
+- UI sweep nits to fix: silent fetch errors in OutreachClient/AskWidget (no `.ok` check), shared
+  date util, mobile table overflow on /sold + /inventory.
 
 ## ✅ Landed this session
 - **iMessage leads (P0) — lossless.** `scripts/imessage-ingest.mjs` turns texts into leads:
