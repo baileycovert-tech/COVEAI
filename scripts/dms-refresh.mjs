@@ -147,8 +147,26 @@ async function main() {
     log("sold deals:", deals.length, "$" + totalGross);
   } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
+  // ---- 3b. PER-REP BOARDS — current-month sold by rep → _reps-raw.json (drives reps.json) ----
+  try {
+    const raw = await q(
+      `SELECT sales_representative AS rep, COUNT(*) AS units,
+              SUM(CASE WHEN POSITION('New' IN COALESCE(inventory_type,'')) > 0 THEN 1 ELSE 0 END) AS new_u,
+              SUM(CASE WHEN POSITION('Used' IN COALESCE(inventory_type,'')) > 0 THEN 1 ELSE 0 END) AS used_u,
+              SUM(COALESCE(NULLIF(total_gross,'NaN'::numeric), 0)) AS gross
+       FROM scorecard_sales WHERE sold_date >= date_trunc('month', CURRENT_DATE) GROUP BY sales_representative`
+    );
+    const reps = raw.filter((r) => r.rep).map((r) => ({ rep: r.rep, units: Number(r.units) || 0, new_u: Number(r.new_u) || 0, used_u: Number(r.used_u) || 0, gross: Math.round(num(r.gross) || 0) }));
+    write("_reps-raw.json", JSON.stringify(reps, null, 2));
+    health.ok.reps = reps.length;
+    log("rep boards:", reps.length);
+  } catch (e) { health.errors.reps = e.message; log("reps ERR", e.message); }
+
   await client.close();
   clearTimeout(deadline);
+
+  // rebuild per-rep boards from the fresh raw
+  try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "gen-reps.mjs")], { encoding: "utf8" }); log("gen-reps done"); } catch (e) { log("gen-reps err", e.message); }
 
   // ---- 4. REBUILD the connected people-side from the fresh leads ----
   try {
