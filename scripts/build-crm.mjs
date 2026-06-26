@@ -156,6 +156,27 @@ for (const c of customers) {
   }
 }
 
+// ---- drop leads Bailey clicked out, and anyone already SOLD ----
+// overrides: "remove" = manual click-out, "keep" = never auto-remove (restore beats a sold match).
+// Sold = matched against the booked-deals log (deals.json, customer = last name) by LAST NAME,
+// so a delivered customer falls off the active board automatically — even for text/email/VS leads
+// that don't carry a DMS lead_status. (DMS web leads already drop via the open-leads status filter.)
+// We record exactly what we dropped + why into removed-leads.json so the board can show + restore it.
+const overrides = read("lead-overrides.json", {});
+const dealsLog = read("deals.json", []);
+const soldLast = new Set((Array.isArray(dealsLog) ? dealsLog : []).map((d) => normName(d.customer || "")).filter(Boolean));
+const lastNameOf = (full) => { const t = normName(full).split(" "); return t[t.length - 1] || ""; };
+const removedLog = [];
+for (let i = customers.length - 1; i >= 0; i--) {
+  const c = customers[i];
+  const k = normName(c.name);
+  if (overrides[k] === "keep") continue;                 // restored — never auto-remove
+  if (overrides[k] === "remove") { removedLog.push({ name: c.name, reason: "clicked out" }); customers.splice(i, 1); continue; }
+  if (soldLast.has(lastNameOf(c.name))) { removedLog.push({ name: c.name, reason: "sold" }); customers.splice(i, 1); }
+}
+const nDropped = removedLog.length;
+write("removed-leads.json", removedLog);
+
 // ---- pipeline columns (same people, grouped by live stage) ----
 const COLS = [
   { key: "hot", title: "Needs first contact", stages: ["hot"] },
@@ -206,4 +227,4 @@ write("customers.json", cleanCustomers);
 write("pipeline.json", pipeline);
 write("lead-feed.json", feedAll);
 
-console.log(`build-crm: ${cleanCustomers.length} customers · pipeline ${nNew} new / ${nWork} working / ${customers.length - nNew - nWork} aging · feed ${feedAll["bailey-covert"].length}`);
+console.log(`build-crm: ${cleanCustomers.length} customers · pipeline ${nNew} new / ${nWork} working / ${customers.length - nNew - nWork} aging · dropped ${nDropped} (sold/clicked-out) · feed ${feedAll["bailey-covert"].length}`);

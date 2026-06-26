@@ -97,6 +97,21 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D19 — Click-out + auto-remove-on-sold (2026-06-26)
+Bailey: a way to get rid of leads, and a sold lead should drop off the board. Added a per-lead
+override file `data/lead-overrides.json` (`"remove"` = clicked out · `"keep"` = restored / never
+auto-remove). `build-crm` drops: overrides=remove, plus anyone whose **last name** matches a booked
+deal in `deals.json` (the sold log — there is no `sold.json`; the /sold page's `getSold` reads a
+file that doesn't exist yet). It writes `removed-leads.json` (what it dropped + why) which the
+/pipeline **Removed** section shows, each restorable. The "✕" on every pipeline lead clicks it out
+(`POST /api/leads/dismiss`), rebuilds, and it vanishes.
+*Caveat:* sold-match is **last-name only** (deals.json carries just a last name), so a name
+collision could clear a live lead — that's why every removal is visible + restorable. Tightens to
+full-name/stock once the DMS (`scorecard_sales`) is reachable again. Verified: Jason Nassour + Kyle
+Campbell auto-cleared as sold; click-out/restore round-trips.
+*Note:* the deeper "pages not updating" cause is the ingest loops being idle — iMessage tail still
+needs Full Disk Access on `/usr/local/bin/node`, DMS is 403. A manual catch-up refreshed the board.
+
 ### D18 — Multi-channel lead ingestion: one parser, four sources (2026-06-26)
 "All my texts, gmails, and VinSolutions leads picked up, no misses." Extracted the lead vocabulary +
 `parseLeadAlert` into `scripts/lib-leads.mjs` (ONE source of truth) so every channel parses Bailey's
