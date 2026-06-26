@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "../lib/auth";
 import {
-  currentMonthBoard, getPipeline, getBriefSignals, getProfile, money,
+  currentMonthBoard, getPipeline, getBriefSignals, getProfile, getReps, money,
 } from "../lib/data";
 import { PageHead, StatCard } from "../components/ui";
-import { Sun, Flame, MessageSquare, Mail, ListChecks, Car, DollarSign, Target, Lightbulb } from "lucide-react";
+import { Sun, Flame, MessageSquare, Mail, ListChecks, Car, DollarSign, Target, Lightbulb, UserCog } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +26,19 @@ export default function BriefPage() {
   const me = currentUser();
   if (!me) redirect("/login");
   const sees = me.seesFinancials;
-  const board = currentMonthBoard();
   const profile = getProfile();
-  const pipe = getPipeline();
-  const signals = getBriefSignals(7, 14);
 
-  const hot = pipe.columns.find((c) => c.key === "hot")?.leads ?? [];
-  const working = pipe.columns.find((c) => c.key === "working")?.leads ?? [];
+  // DATA ISOLATION: the captured texts/leads belong to the capture owner (admin). Other reps
+  // see only THEIR own numbers (from reps.json, scoped by their slug) — never someone else's
+  // book. Their lead feed populates from the DMS by their S1 once access is restored.
+  const isOwner = me.isAdmin;
+  const board = currentMonthBoard();
+  const myBoard = getReps().bySlug?.[me.slug];
+  const pipe = getPipeline();
+  const signals = isOwner ? getBriefSignals(7, 14) : [];
+
+  const hot = isOwner ? (pipe.columns.find((c) => c.key === "hot")?.leads ?? []) : [];
+  const working = isOwner ? (pipe.columns.find((c) => c.key === "working")?.leads ?? []) : [];
   const needsTouch = [...hot, ...working].slice(0, 8);
 
   // Pace math (uses today's date; calendar-day approximation for selling days).
@@ -40,10 +46,15 @@ export default function BriefPage() {
   const day = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = daysInMonth - day;
-  const units = board?.units ?? 0;
+  // Scorecard numbers: owner = store board, rep = their own sold-log board.
+  const units = isOwner ? (board?.units ?? 0) : (myBoard?.units ?? 0);
+  const newU = isOwner ? (board?.newUnits ?? 0) : (myBoard?.newU ?? 0);
+  const usedU = isOwner ? (board?.usedUnits ?? 0) : (myBoard?.usedU ?? 0);
+  const gross = isOwner ? (board?.totalGross ?? 0) : (myBoard?.gross ?? 0);
+  const fiPvr = isOwner ? (board?.fiPvr ?? 0) : (myBoard && myBoard.units ? Math.round(myBoard.gross / myBoard.units) : 0);
   const perDay = day ? units / day : 0;
   const projected = Math.round(perDay * daysInMonth);
-  const goal = board?.unitGoal || 50;
+  const goal = (isOwner ? board?.unitGoal : 0) || 15;
   const gap = Math.max(0, goal - units);
 
   const imsg = signals.filter((s) => s.channel === "iMessage");
@@ -64,15 +75,34 @@ export default function BriefPage() {
 
       {/* Scorecard */}
       <div className="grid cols-4">
-        <StatCard ico={<Car />} label="Units MTD" value={String(units)} sub={`${board?.newUnits ?? 0}N / ${board?.usedUnits ?? 0}U · pace ${perDay.toFixed(1)}/day`} />
+        <StatCard ico={<Car />} label="Units MTD" value={String(units)} sub={`${newU}N / ${usedU}U · pace ${perDay.toFixed(1)}/day`} />
         <StatCard ico={<Target />} label="Projected" value={String(projected)} sub={`${daysLeft} selling days left`} />
         <StatCard ico={<Flame />} label="Gap to goal" value={String(gap)} sub={`goal ${goal} units`} />
         {sees ? (
-          <StatCard ico={<DollarSign />} label="Gross MTD" value={money(board?.totalGross ?? 0)} sub={`F&I PVR ${money(board?.fiPvr ?? 0)}`} />
+          <StatCard ico={<DollarSign />} label={isOwner ? "Gross MTD" : "Your gross MTD"} value={money(gross)} sub={`F&I PVR ${money(fiPvr)}`} />
         ) : (
           <StatCard ico={<ListChecks />} label="Needs touch" value={String(needsTouch.length)} sub={`${hot.length} need first contact`} />
         )}
       </div>
+
+      {/* Reps: until their own lead sources are connected, point them to setup instead of
+          showing someone else's book. */}
+      {!isOwner && (
+        <div className="card pad-lg section-gap">
+          <div className="callout">
+            <span className="ico"><UserCog /></span>
+            <div>
+              <strong>Connect your leads to COVE</strong>
+              <div className="stat-sub" style={{ marginTop: 4 }}>
+                Your numbers above are yours. To pull your <strong>own</strong> text/email leads onto this brief,
+                add your phone and email in <a className="card-link" href="/setup">Setup</a>. Your DMS leads populate
+                automatically from your employee number once live access is restored.
+              </div>
+              <a className="btn primary mt" href="/setup"><UserCog size={15} /> Finish my setup</a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New / needs-touch leads */}
       <div className="card pad-lg section-gap">

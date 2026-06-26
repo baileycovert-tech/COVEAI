@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserPlus, KanbanSquare, Users, Sparkles,
-  Car, TrendingUp, Activity, LogOut, Receipt, Sun,
+  Car, TrendingUp, Activity, LogOut, Receipt, Sun, UserCog,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -25,6 +25,7 @@ const NAV: NavEntry[] = [
   { href: "/inventory", label: "Inventory", Icon: Car },
   { href: "/metrics", label: "Metrics", Icon: TrendingUp, fin: true },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
+  { href: "/setup", label: "Setup", Icon: UserCog },
 ];
 
 export default function Sidebar({ name, title, isAdmin, seesFinancials }: { name: string; title: string; isAdmin?: boolean; seesFinancials?: boolean }) {

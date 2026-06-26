@@ -97,6 +97,23 @@ Update: throttled `com.covert.crm-refresh` 300s→1800s (`./scripts/install-refr
 stop hammering a Cloudflare-blocked `/sse`; if it's a rate-limit this lets it self-recover. The 403
 is at Cloudflare's edge (`server: cloudflare`, body "Forbidden"), not the DMS app — `/health` is 200.
 
+### D20 — Multi-user: setup page + data isolation (2026-06-26)
+Other reps logging in saw Bailey's book (the whole pipeline is single-tenant; /brief's getBriefSignals
+read ALL captured threads). Fixed:
+- `/setup` page + `data/user-profiles.json` (per-slug phones[] + emails[]) + `/api/setup`. Each rep adds
+  the phone(s) customers text them and their work email(s); their DMS S1 (already in users.json
+  fordS1/chevyS1) is shown read-only.
+- **Data isolation on /brief**: `isOwner = me.isAdmin`. The captured texts/leads belong to the capture
+  owner (Bailey's Mac/Gmail), so a non-owner rep now sees only THEIR own scorecard (from reps.json by
+  slug) + a "Connect your leads / Finish setup" nudge — never someone else's customers. Verified: rep
+  Aaron's brief has zero of Bailey's leads; Bailey's brief unchanged.
+*Honest constraint (not code-fixable here):* COVE runs on Bailey's Mac reading Bailey's chat.db + Gmail,
+so it can't capture OTHER reps' texts/emails — those live on their own devices. Reps' real leads populate
+from the **DMS by their S1** once the IP allowlist lands (the Stephen email); their own text/email capture
+would need their own COVE instance. The setup phone/email is the attribution mapping for that.
+*Role tabs:* reps still see fewer tabs by the D16 gate (no pipeline/customers/outreach/sold/metrics/health
+unless manager) — by design; widen via set-role.mjs if Bailey wants.
+
 ### D19 — Click-out + auto-remove-on-sold (2026-06-26)
 Bailey: a way to get rid of leads, and a sold lead should drop off the board. Added a per-lead
 override file `data/lead-overrides.json` (`"remove"` = clicked out · `"keep"` = restored / never

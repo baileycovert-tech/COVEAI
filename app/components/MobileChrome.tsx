@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Sun, LayoutDashboard, KanbanSquare, Car, UserPlus, Menu, X,
-  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut,
+  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut, UserCog,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -30,6 +30,7 @@ const MORE: Item[] = [
   { href: "/sold", label: "Sold", Icon: Receipt, fin: true },
   { href: "/metrics", label: "Metrics", Icon: TrendingUp, fin: true },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
+  { href: "/setup", label: "Setup", Icon: UserCog },
 ];
 
 export default function MobileChrome({ isAdmin, seesFinancials, name }: { isAdmin?: boolean; seesFinancials?: boolean; name: string }) {
