@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Sun, LayoutDashboard, KanbanSquare, Car, UserPlus, Menu, X,
-  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut, UserCog, BookUser,
+  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut, UserCog, BookUser, Megaphone,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -20,6 +20,7 @@ const PRIMARY: Item[] = [
 const MORE: Item[] = [
   { href: "/leads/new", label: "Add Lead", Icon: UserPlus },
   { href: "/outreach", label: "AI Outreach", Icon: Sparkles },
+  { href: "/blast", label: "Blast", Icon: Megaphone },
   { href: "/customers", label: "Customers", Icon: Users },
   { href: "/contacts", label: "Contacts", Icon: BookUser },
   { href: "/sold", label: "Sold", Icon: Receipt },
