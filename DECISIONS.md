@@ -282,3 +282,18 @@ Admin will be where my father (Chance Covert, owner) sees everything."
 - Managers see store totals + their own; the full per-rep table is owner(admin)-only.
 - *Open:* Chance Covert isn't in the DMS (no employee number), so his admin login needs a chosen
   credential from Bailey.
+
+## Contacts auto-sync + safe (no-Cloudflare-blip) deploys (2026-06-29)
+*Why:* "all 35000+ contacts ... need to be able to be found and get updated in COVE" + "make sure
+Cloudflare doesn't crash when making these changes."
+- **Contact search** now returns ALL 54k+ contacts (was filtering to phone-having only, hiding ~23k
+  email-only). Searches by name / phone / email and overlays saved corrections. (prior commit)
+- **sync-contacts.mjs**: reads the Mac's AddressBook stores (read-only, all sources) and upserts
+  phones+emails into data/contacts.db as source="iPhone (synced)" — idempotent (replaces only the
+  synced rows, keeps the dealership CSV import). launchd `com.covert.crm-contacts` runs it every 12h
+  under /usr/local/bin/node (needs FDA for the TCC-protected AddressBook). First run added 4,028 rows
+  (index 54,350 → 58,378). contacts.db is read live by the app, so a sync needs NO restart.
+- **Safe deploy** (`scripts/deploy.sh` + `distDir` env in next.config): builds into `.next.new` while
+  the current build keeps serving (Cloudflare target stays up through the slow build), then swaps +
+  restarts — only a ~3s blip instead of a ~40s outage. A failed build leaves the live app untouched
+  (no broken state, no KeepAlive crash-loop). Use `bash scripts/deploy.sh` for all future code deploys.
