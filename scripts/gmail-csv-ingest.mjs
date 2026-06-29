@@ -77,6 +77,39 @@ function rowToLead(headerKinds, cells, fileLabel) {
   };
 }
 
+// --- VinSolutions / motosnap "Daily lead dump" export: a rich CRM export with EXACT, named
+// columns. The generic keyword mapper mismaps it (grabs "Last Attempted Phone Contact" for the
+// phone, "Has Vehicle Of Interest"=Yes for the vehicle). Detect it by its signature headers and
+// map by exact name instead. Crucially this format carries "Sales Rep" (→ attribution) and
+// "Lead Status" (→ drop already-sold/dead rows). ---
+const isVinExport = (header) => {
+  const h = header.map((x) => x.trim().toLowerCase());
+  return h.includes("customer") && h.includes("sales rep") && h.includes("lead status");
+};
+// statuses that mean "no longer an open lead" — these are sold/dead/junk, not pipeline
+const CLOSED_STATUS = /deliver|\bsold\b|duplicate|\blost\b|\bdead\b|\bbad\b|inactive|closed|not interested|no longer|unqualified|do not/i;
+function vinRowToLead(idx, cells) {
+  const at = (name) => { const i = idx[name.toLowerCase()]; return i != null ? (cells[i] || "").trim() : ""; };
+  const name = at("Customer");
+  const phone = phone10(at("Cell Phone") || at("Daytime Phone") || at("Evening Phone") || "");
+  const email = at("Email").toLowerCase();
+  if (!name && !phone && !email) return null;
+  // vehicle of interest: prefer the initial VOI year/make/model, else the current make/model
+  const voi = [at("Initial Vehicle Year"), at("Initial Vehicle Make"), at("Initial Vehicle Model")].filter(Boolean).join(" ").trim();
+  const cur = [at("Make"), at("Model")].filter(Boolean).join(" ").trim();
+  return {
+    name: titleCase(name) || (email ? email.split("@")[0] : "Lead " + (phone ? phone.slice(-4) : "")),
+    phone: phone && phone.length === 10 ? phone : null,
+    email: email || null,
+    vehicle: voi || cur,
+    stock: at("Stock Number") || null,
+    source: at("Lead Source") || "VinSolutions",
+    date: at("Lead Origination Date") || at("Created DateTime") || "",
+    rep: at("Sales Rep"),
+    status: at("Lead Status"),
+  };
+}
+
 if (!fs.existsSync(DROP)) { log(`no drop folder ${DROP} — nothing to do (producer hasn't downloaded any CSVs)`); process.exit(0); }
 const files = fs.readdirSync(DROP).filter((f) => /\.csv$/i.test(f));
 if (!files.length) { log("no CSVs in drop folder"); process.exit(0); }
@@ -89,18 +122,31 @@ const markSeen = db.prepare("INSERT OR IGNORE INTO seen(key,ts) VALUES(?,?)");
 const leads = read("gmail-csv-leads.json", []);
 const leadByKey = new Map(leads.map((l) => [l.email || l.phone || kebab(l.name), l]));
 const nowISO = new Date().toISOString();
-let nNew = 0, nDup = 0, nFiles = 0;
+// COVE's main board is Bailey's. The VinSolutions export carries every rep's leads, so attribute
+// by the "Sales Rep" column and only union Bailey's open leads here. Other reps' rows are tallied
+// into byRep (data/csv-rep-leads.json) so per-rep boards can pick them up later.
+const OWNER = /bailey/i;
+const byRep = {};
+let nNew = 0, nDup = 0, nFiles = 0, nClosed = 0, nOtherRep = 0;
 
 for (const file of files) {
   const text = fs.readFileSync(path.join(DROP, file), "utf8");
   const rows = parseCSV(text);
   if (rows.length < 2) continue;
   nFiles++;
-  const headerKinds = rows[0].map(colKind);
+  const header = rows[0];
+  const vin = isVinExport(header);
+  const headerKinds = header.map(colKind);
+  const idx = {}; header.forEach((h, i) => { if (!(h.trim().toLowerCase() in idx)) idx[h.trim().toLowerCase()] = i; });
   const fileLabel = /motosnap|105|lead dump/i.test(file) ? "Lead CSV" : file.replace(/\.csv$/i, "");
   for (const cells of rows.slice(1)) {
-    const lead = rowToLead(headerKinds, cells, fileLabel);
+    const lead = vin ? vinRowToLead(idx, cells) : rowToLead(headerKinds, cells, fileLabel);
     if (!lead) continue;
+    if (vin) {
+      if (lead.rep) byRep[lead.rep] = (byRep[lead.rep] || 0) + 1;
+      if (lead.status && CLOSED_STATUS.test(lead.status)) { nClosed++; continue; }   // sold/dead/dup — not a lead
+      if (lead.rep && !OWNER.test(lead.rep)) { nOtherRep++; continue; }              // another rep's lead
+    }
     const hash = crypto.createHash("sha1").update((lead.email || "") + "|" + (lead.phone || "") + "|" + lead.name.toLowerCase() + "|" + lead.vehicle.toLowerCase()).digest("hex").slice(0, 16);
     const key = "csv:" + hash;
     if (isSeen.get(key)) { nDup++; continue; }
@@ -117,7 +163,8 @@ for (const file of files) {
 
 const finalLeads = [...leadByKey.values()].sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 write("gmail-csv-leads.json", finalLeads);
-write("gmail-csv-status.json", { at: nowISO, files: nFiles, newLeads: nNew, dupes: nDup, total: finalLeads.length });
+write("csv-rep-leads.json", { at: nowISO, byRep });   // per-rep lead counts seen across the export (for rep boards)
+write("gmail-csv-status.json", { at: nowISO, files: nFiles, newLeads: nNew, dupes: nDup, closed: nClosed, otherRep: nOtherRep, total: finalLeads.length });
 db.close();
 try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "build-crm.mjs")], { encoding: "utf8", stdio: "inherit" }); } catch (e) { log("build-crm err", e.message); }
-log(JSON.stringify({ files: nFiles, newLeads: nNew, dupes: nDup }));
+log(JSON.stringify({ files: nFiles, newLeads: nNew, dupes: nDup, closed: nClosed, otherRep: nOtherRep, byRep }));

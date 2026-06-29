@@ -10,7 +10,9 @@ cat > "$PLIST" <<PL
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>$ROOT/scripts/gmail-pull.py</string></array>
+  <!-- Run via /usr/local/bin/node (which has Full Disk Access) so the python child inherits it.
+       The project lives under ~/Documents (TCC-protected); bare /usr/bin/python3 gets EPERM. -->
+  <key>ProgramArguments</key><array><string>/usr/local/bin/node</string><string>$ROOT/scripts/gmail-pull-runner.mjs</string></array>
   <key>WorkingDirectory</key><string>$ROOT</string>
   <key>StartInterval</key><integer>$INTERVAL</integer>
   <key>RunAtLoad</key><true/>

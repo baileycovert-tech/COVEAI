@@ -24,7 +24,12 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Optional
 
-# deal-mailer already proved this credential works for Bailey's Gmail.
+# Bailey's default sending credential. The autonomous Gmail puller proved this work-account
+# app password (data/.gmail-app-password + data/.gmail-user) authenticates for both IMAP and SMTP;
+# the old mcp/deal-mailer/config.json held a personal @gmail.com that Google no longer accepts.
+DATA = Path(__file__).resolve().parent.parent / "data"
+PW_FILE = DATA / ".gmail-app-password"
+USER_FILE = DATA / ".gmail-user"
 CONFIG = Path(__file__).resolve().parent.parent.parent / "mcp" / "deal-mailer" / "config.json"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -78,11 +83,16 @@ def send_imessage(recipient: str, body: str):
 
 
 def load_app_password():
+    # 1) the proven work-account credential the Gmail puller uses
+    if PW_FILE.exists():
+        user = USER_FILE.read_text().strip() if USER_FILE.exists() else "baileycovert@covertauto.com"
+        return user, PW_FILE.read_text().strip().replace(" ", "")
+    # 2) legacy deal-mailer config (fallback)
     try:
         cfg = json.loads(CONFIG.read_text())
-        return cfg["gmail_user"], cfg["app_password"]
+        return cfg["gmail_user"], cfg["app_password"].replace(" ", "")
     except Exception as e:
-        out(False, f"Could not read Gmail credential from {CONFIG}: {e}")
+        out(False, f"No Gmail credential found ({PW_FILE} or {CONFIG}): {e}")
 
 
 def send_email(recipient: str, subject: str, body: str):

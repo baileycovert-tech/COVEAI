@@ -27,6 +27,7 @@ DROP = DATA / "_gmail-csv"
 SE_DIR = ROOT / "sources" / "stoneeagle"
 UID_FILE = DATA / "_gmail-uid.txt"
 IMAP_HOST = "imap.gmail.com"
+FIRST_RUN_DAYS = 10  # bound the very first catch-up so it doesn't scan the whole inbox
 
 LEAD_SENDERS = re.compile(r"(700credit|carfax|autotrader|cargurus|truecar|capitalone|dealer\.com|vinsolutions|vinmanager)", re.I)
 NOISE_SENDERS = re.compile(r"@(stoneeagle|covertcity|barcoment|mx\.forduniversity|dealer\.gmfinancial)\.|^(reportscheduler|marketing\.emails|newsletter)@", re.I)
@@ -84,6 +85,11 @@ def parse_stoneeagle(pdf_path: Path):
         if fipvr is None or tg is None or skip.search(c[0]) or len(c[0]) < 4: continue
         nm = " ".join(w.capitalize() if w.isupper() else w for w in c[0].split())
         rows.append({"name": nm, "units": int(c[3]), "fiPvr": round(fipvr, 2), "gross": round(tg, 2)})
+    if not rows:
+        # Not the F&I ranking layout (StoneEagle sends several report types). Never overwrite a
+        # good leaderboard with an empty parse — just skip.
+        log(f"StoneEagle PDF {pdf_path.name} parsed 0 ranking rows — skipped (not the ranking report)")
+        return
     rows.sort(key=lambda x: -x["gross"])
     asof = re.search(r"(\d{8})", pdf_path.stem)
     asof = f"{asof.group(1)[:4]}-{asof.group(1)[4:6]}-{asof.group(1)[6:8]}" if asof else datetime.now().strftime("%Y-%m-%d")
@@ -106,10 +112,20 @@ def main():
         raise SystemExit(f"IMAP login failed ({e}). Regenerate the Gmail App Password and update data/.gmail-app-password.")
     M.select("INBOX")
 
-    # everything newer than the watermark UID
-    typ, data = M.uid("search", None, f"UID {last_uid + 1}:*")
-    uids = [u for u in (data[0].split() if data and data[0] else []) if int(u) > last_uid]
-    log(f"login OK · {len(uids)} new messages since UID {last_uid}")
+    # Only the senders that carry leads/reports — never scan the whole inbox. First run is
+    # bounded to recent (SINCE); after that the UID watermark keeps it to genuinely-new mail.
+    from datetime import timedelta
+    SENDERS = ["motosnap", "stoneeagle", "700credit", "vinsolutions", "autotrader", "cargurus", "carfax", "truecar", "capitalone"]
+    since = (datetime.now() - timedelta(days=FIRST_RUN_DAYS)).strftime("%d-%b-%Y")
+    uidset = set()
+    for s in SENDERS:
+        crit = ["FROM", s] + ([] if last_uid else ["SINCE", since])
+        typ, data = M.uid("search", None, *crit)
+        for u in (data[0].split() if data and data[0] else []):
+            if int(u) > last_uid:
+                uidset.add(int(u))
+    uids = [str(u).encode() for u in sorted(uidset)]
+    log(f"login OK · {len(uids)} lead/report messages to process (since UID {last_uid})")
 
     inbox_leads, n_csv, n_se, max_uid = [], 0, 0, last_uid
     for uid in uids:
