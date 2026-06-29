@@ -18,6 +18,7 @@ export default function AskWidget() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
   const [keyInput, setKeyInput] = useState("");
   const [savingKey, setSavingKey] = useState(false);
   const [keyErr, setKeyErr] = useState("");
@@ -26,7 +27,7 @@ export default function AskWidget() {
   useEffect(() => { scroller.current?.scrollTo({ top: 9e9, behavior: "smooth" }); }, [msgs, busy]);
   useEffect(() => {
     if (open && hasKey === null) {
-      fetch("/api/settings/key").then((r) => r.json()).then((d) => setHasKey(!!d.hasKey)).catch(() => setHasKey(false));
+      fetch("/api/settings/key").then((r) => r.json()).then((d) => { setHasKey(!!d.hasKey); setCanEdit(!!d.canEdit); }).catch(() => setHasKey(false));
     }
   }, [open, hasKey]);
 
@@ -94,8 +95,9 @@ export default function AskWidget() {
       </div>
 
       <div className="ask-body" ref={scroller}>
-        {/* Key entry — shown only until a key is active. Entered here, never in chat. */}
-        {hasKey === false && (
+        {/* Key entry — only the admin/owner can set the shared server key, and only when none is
+            active. Reps never see this: their chatbot runs on the shared key automatically. */}
+        {hasKey === false && canEdit && (
           <div className="ask-keybox">
             <div className="flex" style={{ gap: 7, fontWeight: 600, fontSize: 13 }}><KeyRound size={15} /> Unlock the full assistant</div>
             <div className="ask-hint" style={{ marginTop: 6 }}>

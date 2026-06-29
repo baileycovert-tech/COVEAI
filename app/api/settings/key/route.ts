@@ -7,10 +7,12 @@ export const dynamic = "force-dynamic";
 
 const ENV = path.join(process.cwd(), ".env.local");
 
-// GET → is a key already active?
+// GET → is a key already active? Any signed-in user may CHECK (so the chatbot, which runs on the
+// one shared server key for everyone, doesn't nag reps to paste a key). Only admins may SET one.
 export async function GET() {
-  if (!currentUser()?.isAdmin) return NextResponse.json({ error: "admin only" }, { status: 403 });
-  return NextResponse.json({ hasKey: !!process.env.ANTHROPIC_API_KEY });
+  const me = currentUser();
+  if (!me) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  return NextResponse.json({ hasKey: !!process.env.ANTHROPIC_API_KEY, canEdit: !!me.isAdmin });
 }
 
 // POST { key } → save the Anthropic key to .env.local AND activate it live (no restart).
