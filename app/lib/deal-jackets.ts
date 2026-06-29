@@ -30,7 +30,7 @@ export type DealJacket = {
 };
 
 export type Routing = { desk: string; finance: string };
-const DEFAULT_ROUTING: Routing = { desk: "evan", finance: "johnny" };
+const DEFAULT_ROUTING: Routing = { desk: "evanramsey@covertauto.com", finance: "johnnytownsend@covertauto.com" };
 
 function readAll(): DealJacket[] {
   try { return JSON.parse(fs.readFileSync(FILE, "utf8")); } catch { return []; }

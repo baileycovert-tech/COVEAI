@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { FileText, Send, Check, Building2, Banknote, Loader2, ExternalLink, Trash2, CircleCheck } from "lucide-react";
+import { FileText, Send, Check, Building2, Banknote, Loader2, ExternalLink, Trash2, CircleCheck, Search, UserPlus } from "lucide-react";
 
 type Stage = "ready" | "at_desk" | "at_finance" | "done";
 type Jacket = {
@@ -9,6 +9,7 @@ type Jacket = {
   desk: string; finance: string; history: { at: string; event: string }[];
 };
 type Routing = { desk: string; finance: string };
+type Cust = { slug: string; name: string; phone: string; email: string; vehicle: string };
 
 const STAGE: Record<Stage, { label: string; cls: string }> = {
   ready:      { label: "Ready to approve", cls: "" },
@@ -17,23 +18,31 @@ const STAGE: Record<Stage, { label: string; cls: string }> = {
   done:       { label: "Funded", cls: "green" },
 };
 
-const PEOPLE = [
-  { alias: "evan", role: "Sales mgr / desking" }, { alias: "sidney", role: "Desking" },
-  { alias: "mark", role: "Sales mgr" }, { alias: "ricardo", role: "Sales mgr" },
-  { alias: "johnny", role: "F&I primary" }, { alias: "jose", role: "F&I" },
-  { alias: "lorenzo", role: "F&I / appraisal" }, { alias: "stephen", role: "GSM" },
-];
+// Covert email convention is {first}{last}@covertauto.com (verified against the known F&I/desk addresses).
+const mkEmail = (full: string) => full.toLowerCase().replace(/[^a-z]/g, "") + "@covertauto.com";
+// Desk = Sales Managers; Finance = Finance + Special-Finance managers. Full roster from the DMS.
+const DESK = ["Evan Ramsey", "Sidney Clark", "Ricardo Casas", "Mark Eggleston", "Adam North", "Jason Fox",
+  "Kevin Cancela", "Lorenzo Beltran", "Roland Duron", "Issac Molina", "Lad Bartosh"]
+  .map((n) => ({ name: n, email: mkEmail(n), role: "Desk / sales mgr" }));
+const FINANCE = ["Johnny Townsend", "Jose Cantoran", "Marcus Reiland", "Lee Dobbins", "David Cuellar",
+  "Jennifer Garrison", "Bradley Laroche", "Kelly Mercer", "James Munoz", "Randy Robinson",
+  "Isidro Rodriguez", "Brandon Sokol", "Carlos Tercero", "Jacob Valadez"]
+  .map((n) => ({ name: n, email: mkEmail(n), role: "F&I" }));
+const ALL_PEOPLE = [...DESK, ...FINANCE];
+const nameFor = (v: string) => ALL_PEOPLE.find((p) => p.email === v)?.name || v;
 
-export default function CloseDealForm({ jackets: initial, routing }: { jackets: Jacket[]; routing: Routing }) {
+export default function CloseDealForm({ jackets: initial, routing, customers }: { jackets: Jacket[]; routing: Routing; customers: Cust[] }) {
   const [jackets, setJackets] = useState<Jacket[]>(initial);
+  const [pick, setPick] = useState("");
+  const [pickOpen, setPickOpen] = useState(false);
   const [type, setType] = useState<"new" | "used">("used");
   const [c, setC] = useState<any>({});
   const [v, setV] = useState<any>({});
   const [t, setT] = useState<any>({});
   const [hasTrade, setHasTrade] = useState(false);
   const [dealNumber, setDealNumber] = useState("");
-  const [desk, setDesk] = useState(routing.desk);
-  const [finance, setFinance] = useState(routing.finance);
+  const [desk, setDesk] = useState(DESK.find((p) => p.email === routing.desk)?.email || DESK[0].email);
+  const [finance, setFinance] = useState(FINANCE.find((p) => p.email === routing.finance)?.email || FINANCE[0].email);
   const [photosDir, setPhotosDir] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -42,6 +51,22 @@ export default function CloseDealForm({ jackets: initial, routing }: { jackets: 
   const upC = (k: string, val: string) => setC((o: any) => ({ ...o, [k]: val }));
   const upV = (k: string, val: string) => setV((o: any) => ({ ...o, [k]: val }));
   const upT = (k: string, val: string) => setT((o: any) => ({ ...o, [k]: val }));
+
+  // Clicking a customer fills everything COVE has; the rep fills in the rest (address, DOB, DL, VIN…).
+  const matches = (() => {
+    const q = pick.trim().toLowerCase();
+    const list = q ? customers.filter((c) => c.name.toLowerCase().includes(q) || (c.vehicle || "").toLowerCase().includes(q)) : customers;
+    return list.slice(0, 8);
+  })();
+  function selectCustomer(cust: Cust) {
+    const parts = (cust.name || "").trim().split(/\s+/);
+    setC({ first_name: parts[0] || "", last_name: parts.slice(1).join(" "), phone: cust.phone || "", email: cust.email || "" });
+    const vi = (cust.vehicle || "").trim();
+    const ym = vi.match(/^(\d{4})\s+(.*)$/);          // "2026 Ford F-150" → year/make/model
+    if (ym) { const r = ym[2].split(/\s+/); setV({ year: ym[1], make: r[0] || "", model: r.slice(1).join(" ") }); }
+    else if (vi) { const r = vi.split(/\s+/); setV({ make: r[0] || "", model: r.slice(1).join(" ") }); }
+    setPick(cust.name); setPickOpen(false);
+  }
 
   async function build() {
     setBusy(true); setErr("");
@@ -87,6 +112,25 @@ export default function CloseDealForm({ jackets: initial, routing }: { jackets: 
       <div className="card pad-lg">
         <div className="card-title" style={{ marginBottom: 4 }}><span className="ico"><FileText /></span>New deal packet</div>
         <div className="stat-sub" style={{ marginBottom: 14 }}>COVE fills the {type === "new" ? "Ford New" : "Used"} packet, then you approve and route it. Nothing sends until you click approve.</div>
+
+        {/* Customer picker — click a customer and the form fills with everything COVE has on them. */}
+        <label className="stat-label" style={{ fontSize: 11 }}><Search size={11} style={{ verticalAlign: "-1px", marginRight: 4 }} />Pull up a customer</label>
+        <div style={{ position: "relative", marginTop: 3, marginBottom: 16 }}>
+          <input className="field" placeholder={customers.length ? "Search your customers by name or vehicle…" : "No saved customers yet — fill the form below"}
+            value={pick} onChange={(e) => { setPick(e.target.value); setPickOpen(true); }} onFocus={() => setPickOpen(true)}
+            onBlur={() => setTimeout(() => setPickOpen(false), 150)} />
+          {pick && <button type="button" className="picker-clear" onClick={() => { setPick(""); setC({}); setV({}); }} aria-label="Clear">×</button>}
+          {pickOpen && matches.length > 0 && (
+            <div className="picker-menu">
+              {matches.map((cust) => (
+                <button type="button" key={cust.slug} className="picker-item" onMouseDown={(e) => { e.preventDefault(); selectCustomer(cust); }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}><UserPlus size={13} style={{ color: "hsl(var(--primary))" }} /><strong>{cust.name}</strong></span>
+                  <span className="muted" style={{ fontSize: 12 }}>{cust.vehicle || cust.phone || cust.email || ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex" style={{ gap: 8, marginBottom: 14 }}>
           {(["used", "new"] as const).map((tp) => (
@@ -166,13 +210,13 @@ export default function CloseDealForm({ jackets: initial, routing }: { jackets: 
           <div style={{ minWidth: 220 }}>
             <label className="stat-label" style={{ fontSize: 11 }}><Building2 size={11} style={{ verticalAlign: "-1px", marginRight: 4 }} />Desk (approval)</label>
             <select className="field" value={desk} onChange={(e) => setDesk(e.target.value)} style={{ marginTop: 3 }}>
-              {PEOPLE.map((p) => <option key={p.alias} value={p.alias}>{p.alias} — {p.role}</option>)}
+              {DESK.map((p) => <option key={p.email} value={p.email}>{p.name}</option>)}
             </select>
           </div>
           <div style={{ minWidth: 220 }}>
             <label className="stat-label" style={{ fontSize: 11 }}><Banknote size={11} style={{ verticalAlign: "-1px", marginRight: 4 }} />Finance (F&I)</label>
             <select className="field" value={finance} onChange={(e) => setFinance(e.target.value)} style={{ marginTop: 3 }}>
-              {PEOPLE.map((p) => <option key={p.alias} value={p.alias}>{p.alias} — {p.role}</option>)}
+              {FINANCE.map((p) => <option key={p.email} value={p.email}>{p.name}</option>)}
             </select>
           </div>
           <div style={{ minWidth: 220, flex: 1 }}>
@@ -209,12 +253,12 @@ export default function CloseDealForm({ jackets: initial, routing }: { jackets: 
 
                     {j.stage === "ready" && (
                       <button className="btn primary sm" onClick={() => act(j.id, "send-desk", { desk })} disabled={busyA("send-desk")}>
-                        {busyA("send-desk") ? <Loader2 className="spin" size={13} /> : <Building2 size={13} />} Approve & send to {j.desk}
+                        {busyA("send-desk") ? <Loader2 className="spin" size={13} /> : <Building2 size={13} />} Approve & send to {nameFor(j.desk)}
                       </button>
                     )}
                     {j.stage === "at_desk" && (
                       <button className="btn primary sm" onClick={() => act(j.id, "send-finance", { finance })} disabled={busyA("send-finance")}>
-                        {busyA("send-finance") ? <Loader2 className="spin" size={13} /> : <Banknote size={13} />} Desk approved → send to {j.finance}
+                        {busyA("send-finance") ? <Loader2 className="spin" size={13} /> : <Banknote size={13} />} Desk approved → send to {nameFor(j.finance)}
                       </button>
                     )}
                     {j.stage === "at_finance" && (
