@@ -145,28 +145,46 @@ async function main() {
     write("sold.json", JSON.stringify({ asOf: today(), source: "GMReview sales_pace + scorecard_sales (live)", count: deals.length, totalGross, deals }, null, 2));
     health.ok.sold = deals.length;
     log("sold deals:", deals.length, "$" + totalGross);
+
+    // deals.json = THIS MONTH's deals for the dashboard's "Recent deals" + count (was going stale).
+    const firstOfMonth = new Date().toISOString().slice(0, 7) + "-01";
+    const monthDeals = deals.filter((d) => (d.date || "") >= firstOfMonth)
+      .map((d) => ({ date: d.date, nuo: d.nuo, yr: String(d.year || ""), make: d.make, model: d.model, customer: d.customer, stock: d.stock, front: d.front, back: d.back, store: d.store }));
+    write("deals.json", JSON.stringify(monthDeals, null, 2));
+    log("month deals (deals.json):", monthDeals.length);
   } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
-  // ---- 3b. PER-REP BOARDS — current-month sold by rep → _reps-raw.json (drives reps.json) ----
+  // ---- 3b. PER-REP BOARDS — EXACT current-month sold by S1 (sales_pace, not name-matched) → reps.json ----
+  // sales_pace keys every deal to the rep's unique S1, catching deals scorecard's name-matching misses
+  // (CH/Ford store name variants). Each user's Ford + Chevy S1 are summed. This is the count reps trust.
   try {
     const raw = await q(
-      `SELECT sales_representative AS rep, COUNT(*) AS units,
-              SUM(CASE WHEN POSITION('New' IN COALESCE(inventory_type,'')) > 0 THEN 1 ELSE 0 END) AS new_u,
-              SUM(CASE WHEN POSITION('Used' IN COALESCE(inventory_type,'')) > 0 THEN 1 ELSE 0 END) AS used_u,
-              SUM(COALESCE(NULLIF(total_gross,'NaN'::numeric), 0)) AS gross
-       FROM scorecard_sales WHERE sold_date >= date_trunc('month', CURRENT_DATE) GROUP BY sales_representative`
+      `SELECT "S1-NUMBER" AS s1, COUNT(*) AS units,
+              SUM(CASE WHEN POSITION('NEW' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS new_u,
+              SUM(CASE WHEN POSITION('USED' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS used_u,
+              SUM(COALESCE(NULLIF("FRONT-GROSS",'NaN'::numeric), 0) + COALESCE(NULLIF("BACK-GROSS",'NaN'::numeric), 0)) AS gross
+       FROM sales_pace WHERE "DATE" >= date_trunc('month', CURRENT_DATE)::text GROUP BY "S1-NUMBER"`
     );
-    const reps = raw.filter((r) => r.rep).map((r) => ({ rep: r.rep, units: Number(r.units) || 0, new_u: Number(r.new_u) || 0, used_u: Number(r.used_u) || 0, gross: Math.round(num(r.gross) || 0) }));
-    write("_reps-raw.json", JSON.stringify(reps, null, 2));
-    health.ok.reps = reps.length;
-    log("rep boards:", reps.length);
+    const byS1 = {};
+    for (const r of raw) if (r.s1 != null) byS1[String(r.s1)] = { units: Number(r.units) || 0, newU: Number(r.new_u) || 0, usedU: Number(r.used_u) || 0, gross: Math.round(num(r.gross) || 0) };
+    const users = JSON.parse(fs.readFileSync(path.join(DATA, "users.json"), "utf8"));
+    const bySlug = {}, board = [];
+    for (const u of users) {
+      const a = byS1[String(u.fordS1)], b = byS1[String(u.chevyS1)];
+      const units = (a?.units || 0) + (b?.units || 0);
+      if (units <= 0) continue;
+      const rec = { units, newU: (a?.newU || 0) + (b?.newU || 0), usedU: (a?.usedU || 0) + (b?.usedU || 0), gross: (a?.gross || 0) + (b?.gross || 0) };
+      bySlug[u.slug] = rec;
+      board.push({ name: u.name, units: rec.units, gross: rec.gross });
+    }
+    const leaderboard = board.sort((x, y) => y.gross - x.gross).map((m, i) => ({ rank: i + 1, name: m.name, units: m.units, gross: m.gross }));
+    write("reps.json", JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), month: new Date().toLocaleString("en-US", { month: "long", year: "numeric" }), bySlug, leaderboard }, null, 2));
+    health.ok.reps = Object.keys(bySlug).length;
+    log("rep boards (by S1):", Object.keys(bySlug).length);
   } catch (e) { health.errors.reps = e.message; log("reps ERR", e.message); }
 
   await client.close();
   clearTimeout(deadline);
-
-  // rebuild per-rep boards from the fresh raw
-  try { execFileSync(process.execPath, [path.join(ROOT, "scripts", "gen-reps.mjs")], { encoding: "utf8" }); log("gen-reps done"); } catch (e) { log("gen-reps err", e.message); }
 
   // ---- 4. REBUILD the connected people-side from the fresh leads ----
   try {
