@@ -266,3 +266,19 @@ with `manager: true` (store-financial visibility). Login credential = employee n
 Ford #. Roster now 65 users (1 admin, 11 managers, 53 reps); change is live immediately (login page
 is force-dynamic, reads users.json fresh). The migration script + login-table backup hold employee
 numbers/hashes, so both are gitignored (PII stays out of version control, per project norm).
+
+## Owner command-center view + real store totals (2026-06-29)
+*Why:* "admin should pull all of the salespeople using cove's leads, and numbers, and managers...
+Admin will be where my father (Chance Covert, owner) sees everything."
+- Admin/owner board now shows: personal "Your month-to-date", real "Store — month-to-date"
+  (team aggregate), and an owner-only "Sales team" table — every rep ranked with units (N/U), gross,
+  per-unit, COVE lead activity; managers flagged. `getTeam()` joins reps.json sales numbers +
+  per-rep COVE lead counts (csv-rep-leads + rep-inbox) + roster roles.
+- **Fixed a long-standing mislabel:** the headline board stats come from `currentMonthBoard()`
+  (metrics.json), which is BAILEY's own monthly history (~28 units), not the store's. Adding a
+  "Store" label exposed it. Managers + owner now see the true store aggregate (416 units / $1.46M
+  across 52 sellers) from getTeam totals; the salesman board and currentMonthBoard fallback are
+  unchanged.
+- Managers see store totals + their own; the full per-rep table is owner(admin)-only.
+- *Open:* Chance Covert isn't in the DMS (no employee number), so his admin login needs a chosen
+  credential from Bailey.
