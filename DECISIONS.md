@@ -216,3 +216,43 @@ Phone normalized/validated, removable (falls back to the index). Open to all rep
 *Sync option (not built):* the Mac's AddressBook DBs ARE present/readable (node has FDA) — a
 `sync-contacts.mjs` could merge them into contacts.db on a schedule; or re-export the CSV and rerun
 build-contacts.mjs. Offered as a follow-up.
+
+## Gmail + StoneEagle autonomous ingestion, and work-account sending (2026-06-29)
+*Why:* "90% of my leads come from my texts and gmail" — Gmail had to flow autonomously,
+including attachments the Gmail MCP can't pull from a cron.
+- **IMAP puller** (`gmail-pull.py`) over the Gmail App Password, bounded to known lead/report
+  senders + a UID watermark so it never rescans the inbox. Pulls VinSolutions/motosnap lead-dump
+  CSVs and StoneEagle ranking PDFs.
+- **The "motosnap CSV" is the full VinSolutions CRM export** — Customer, Cell Phone, Email, vehicle,
+  **Sales Rep**, **Lead Status**. The generic keyword parser mismapped it (grabbed a datetime as
+  the phone, "Has Vehicle Of Interest"=Yes as the vehicle). Added an exact-name VinSolutions branch
+  in `gmail-csv-ingest.mjs`: filters out closed/sold/duplicate statuses, attributes by Sales Rep,
+  unions only Bailey's open leads onto the board (per-rep counts → `csv-rep-leads.json` for future
+  rep boards). This is also the seam for multi-rep lead attribution.
+- **StoneEagle 0-row guard:** several StoneEagle report types arrive; only the F&I ranking has the
+  table. Never overwrite leaderboard.json on a 0-row parse.
+- **TCC/FDA:** launchd `/usr/bin/python3` gets EPERM reading the project under ~/Documents. Fixed by
+  running the job under `/usr/local/bin/node` (which has Full Disk Access) → it spawns python3, which
+  inherits FDA. New `gmail-pull-runner.mjs` shim; `com.covert.crm-gmail` runs every 15 min.
+- **Sending:** `send.py` default credential is now the proven work account
+  (`baileycovert@covertauto.com`, data/.gmail-app-password); the old personal-account deal-mailer
+  config is a dead fallback. SMTP AUTH verified OK.
+- **Secrets:** app password / gmail user / pulled CSVs / StoneEagle PDFs added to .gitignore.
+
+*Still open:* per-employee Setup walkthrough (each rep adds their own App Password so COVE scrapes
+their inbox + sends as them) and the deal-jacket/document-sender built into COVE (sold → fill packet
+→ desk approval → finance).
+
+## Deal jacket built into COVE — build → approve → desk → finance (2026-06-29)
+*Why:* "once I sell a customer, I can automate the paperwork and send to desk for approval then to
+finance." Chosen flow: **approve in COVE, then it sends** (one-tap gate before each send).
+- Ported the proven AcroForm packet filler (`fill_packet.py`) into `covert-crm/scripts/deal-jacket/`
+  with COVE-native paths; copied the two blank templates into `covert-crm/templates/` (gitignored).
+- `send_jacket.py` emails the packet (PDF + auto-discovered DL/insurance/odometer/trade photos) using
+  COVE's verified work-account credential + the coworker alias map (evan/sidney=desk, johnny/jose=F&I).
+- Stage machine in `deal-jackets.ts`: ready → at_desk → at_finance → done; reps see only their own.
+  Routing config (desk/finance) editable, overridable per deal.
+- `/close` page (desktop + mobile nav): form → Build packet → Preview PDF → Approve & send to desk →
+  Desk approved → send to finance → Mark funded. Nothing leaves until the rep approves in-app.
+- Verified end-to-end in preview (build fills a real packet, list renders, PDF preview serves). Real
+  sends not fired in test (they email live coworkers); the SMTP path is the already-auth-verified cred.
