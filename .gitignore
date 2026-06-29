@@ -26,3 +26,7 @@ data/rep-inbox/
 sources/
 tsconfig.tsbuildinfo
 .claude/settings.local.json
+
+# deal-jacket blanks (large binaries) + filled output
+templates/
+data/filled-packets/

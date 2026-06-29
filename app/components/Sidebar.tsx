@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, UserPlus, KanbanSquare, Users, Sparkles,
-  Car, TrendingUp, Activity, LogOut, Receipt, Sun, UserCog, BookUser, Megaphone,
+  Car, TrendingUp, Activity, LogOut, Receipt, Sun, UserCog, BookUser, Megaphone, FileText,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -21,6 +21,7 @@ const NAV: NavEntry[] = [
   { href: "/customers", label: "Customers", Icon: Users },
   { href: "/contacts", label: "Contacts", Icon: BookUser },
   { href: "/sold", label: "Sold", Icon: Receipt },
+  { href: "/close", label: "Close Deal", Icon: FileText },
   { href: "/outreach", label: "AI Outreach", Icon: Sparkles },
   { href: "/blast", label: "Blast", Icon: Megaphone },
   { section: "Know" },

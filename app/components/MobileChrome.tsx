@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Sun, LayoutDashboard, KanbanSquare, Car, UserPlus, Menu, X,
-  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut, UserCog, BookUser, Megaphone,
+  Sparkles, Users, Receipt, TrendingUp, Activity, LogOut, UserCog, BookUser, Megaphone, FileText,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -24,6 +24,7 @@ const MORE: Item[] = [
   { href: "/customers", label: "Customers", Icon: Users },
   { href: "/contacts", label: "Contacts", Icon: BookUser },
   { href: "/sold", label: "Sold", Icon: Receipt },
+  { href: "/close", label: "Close Deal", Icon: FileText },
   { href: "/metrics", label: "Metrics", Icon: TrendingUp },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
   { href: "/setup", label: "Setup", Icon: UserCog },
