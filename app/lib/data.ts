@@ -238,7 +238,35 @@ export const getReps = () => read("reps.json", { asOf: "", month: "", bySlug: {}
 export type TeamMember = {
   rank: number | null; name: string; slug: string; role: "rep" | "manager" | "admin";
   units: number; newU: number; usedU: number; gross: number; perUnit: number; leads: number;
+  activeLeads: number;  // store-wide active CRM leads attributed to this person
 };
+
+// ---------- Whole-store active-lead pipeline (owner/admin view) ----------
+export type StoreLead = { customer: string; rep: string; source: string; status: string; vehicle: string; stock: string; at: string; lastTouch: string };
+export type StoreLeads = { asOf: string; activeTotal: number; reps: number; byRep: Record<string, { active: number; touched3d: number }>; bySource: Record<string, number>; leads: StoreLead[] };
+export const getStoreLeads = (): StoreLeads =>
+  read("store-leads.json", { asOf: "", activeTotal: 0, reps: 0, byRep: {}, bySource: {}, leads: [] } as StoreLeads);
+
+// scorecard rep names ("Kwami Wilborn") vs COVE names ("Kwami Na'Jae Wilborn") reconcile on
+// first + last token, so the CRM pipeline lines up with the sales roster.
+const repTokens = (s: string) => (s || "").toLowerCase().normalize("NFKD").replace(/[^a-z ]/g, " ").split(/\s+/).filter((t) => t.length > 1 && !["jr", "sr", "ii", "iii", "iv"].includes(t));
+export function repNameMatches(a: string, b: string): boolean {
+  const ta = repTokens(a), tb = repTokens(b);
+  if (!ta.length || !tb.length) return false;
+  return ta[0] === tb[0] && ta[ta.length - 1] === tb[tb.length - 1];
+}
+export function storeActiveFor(name: string): { active: number; touched3d: number } {
+  for (const [rep, v] of Object.entries(getStoreLeads().byRep)) if (repNameMatches(rep, name)) return v;
+  return { active: 0, touched3d: 0 };
+}
+export function storeLeadsFor(name: string): StoreLead[] {
+  return getStoreLeads().leads.filter((l) => repNameMatches(l.rep, name));
+}
+// The exact CRM rep name (e.g. "Kwami Wilborn") for a COVE person, for a live per-rep lead query.
+export function storeRepName(name: string): string | null {
+  for (const rep of Object.keys(getStoreLeads().byRep)) if (repNameMatches(rep, name)) return rep;
+  return null;
+}
 export function getTeam(): { month: string; members: TeamMember[]; totals: { units: number; newU: number; usedU: number; gross: number; leads: number; reps: number } } {
   const reps = getReps();
   const bySlug: Record<string, RepBoard> = reps.bySlug || {};
@@ -264,6 +292,9 @@ export function getTeam(): { month: string; members: TeamMember[]; totals: { uni
     }
   } catch {}
 
+  const storeByRep = getStoreLeads().byRep;
+  const activeFor = (nm: string) => { for (const [rep, v] of Object.entries(storeByRep)) if (repNameMatches(rep, nm)) return v.active; return 0; };
+
   const seen = new Set<string>();
   const members: TeamMember[] = leaderboard.map((r) => {
     const slug = slugify(r.name);
@@ -272,14 +303,14 @@ export function getTeam(): { month: string; members: TeamMember[]; totals: { uni
     const leads = (leadByName[norm(r.name)] || 0) + (inboxBySlug[slug] || 0);
     return { rank: r.rank, name: r.name, slug, role: roleOf(slug),
       units: r.units, newU: b.newU || 0, usedU: b.usedU || 0, gross: r.gross,
-      perUnit: r.units ? Math.round(r.gross / r.units) : 0, leads };
+      perUnit: r.units ? Math.round(r.gross / r.units) : 0, leads, activeLeads: activeFor(r.name) };
   });
   // Managers / staff with no attributed sales this month still belong on the owner's roster.
   for (const u of users) {
     if (seen.has(u.slug) || u.isAdmin) continue;
     if (!u.manager) continue; // only surface managers without sales; reps without sales are inactive noise
     members.push({ rank: null, name: u.name, slug: u.slug, role: "manager",
-      units: 0, newU: 0, usedU: 0, gross: 0, perUnit: 0, leads: (inboxBySlug[u.slug] || 0) });
+      units: 0, newU: 0, usedU: 0, gross: 0, perUnit: 0, leads: (inboxBySlug[u.slug] || 0), activeLeads: activeFor(u.name) });
   }
 
   const totals = members.reduce((a, m) => ({ units: a.units + m.units, newU: a.newU + m.newU, usedU: a.usedU + m.usedU, gross: a.gross + m.gross, leads: a.leads + m.leads, reps: a.reps + 1 }), { units: 0, newU: 0, usedU: 0, gross: 0, leads: 0, reps: 0 });

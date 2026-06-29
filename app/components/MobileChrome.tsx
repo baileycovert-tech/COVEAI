@@ -25,6 +25,7 @@ const MORE: Item[] = [
   { href: "/contacts", label: "Contacts", Icon: BookUser },
   { href: "/sold", label: "Sold", Icon: Receipt },
   { href: "/close", label: "Close Deal", Icon: FileText },
+  { href: "/team", label: "Team", Icon: Users, admin: true },
   { href: "/metrics", label: "Metrics", Icon: TrendingUp },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },
   { href: "/setup", label: "Setup", Icon: UserCog },

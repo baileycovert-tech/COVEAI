@@ -1,6 +1,6 @@
 import {
   currentMonthBoard, getMetrics, getDeals, getPipeline,
-  getCustomers, getProfile, getSignals, getReps, getTeam, getLeadFeed, getTextLeads, getImsgStatus, redactPhones, monthTotals, money,
+  getCustomers, getProfile, getSignals, getReps, getTeam, getStoreLeads, getLeadFeed, getTextLeads, getImsgStatus, redactPhones, monthTotals, money,
 } from "./lib/data";
 import { boardFreshness } from "./lib/health";
 import { currentUser } from "./lib/auth";
@@ -8,7 +8,7 @@ import { PageHead, FreshPill, StatCard, UnitsChart, Avatar } from "./components/
 import TeamTable from "./components/TeamTable";
 import {
   Bell, Car, DollarSign, ClipboardList, Trophy, Radio, BarChart3,
-  Flame, ReceiptText, Lightbulb, Megaphone, CarFront, MessageSquare, MailOpen,
+  Flame, ReceiptText, Lightbulb, Megaphone, CarFront, MessageSquare, MailOpen, Inbox,
 } from "lucide-react";
 
 function TextLeadBanner() {
@@ -136,14 +136,16 @@ export default function Dashboard() {
   // Managers run the floor, so they see the whole STORE's numbers. But they also want THEIR OWN
   // month-to-date, so for managers we show a personal strip above the store board.
   const myStats = me ? reps.bySlug?.[me.slug] : null;
-  // Managers and the owner/admin both get a personal "Your numbers" strip above the store board.
-  const showPersonal = !!(me && (me.manager || me.isAdmin));
+  const elevated = !!(me && (me.manager || me.isAdmin));
+  // The "Your month-to-date" strip shows ONLY for an elevated person who actually sells (Bailey, a
+  // selling manager). The owner (Chance, no personal sales) gets a pure store view — no empty strip.
+  const showPersonal = elevated && !!myStats && ((myStats.units || 0) > 0 || (myStats.gross || 0) > 0);
   // Bailey's legacy personal feeds (his texts/pipeline/signals/recent deals) belong to HIM alone —
   // not to other admins. The owner sees the STORE + everyone (team table), never Bailey's own book.
   const isBailey = me?.slug === "bailey-covert";
-  // Managers + owner see real STORE totals (the team aggregate) — currentMonthBoard is Bailey's own
-  // history, not the store's. The owner (admin) additionally gets the full per-rep team table.
-  const team = showPersonal ? getTeam() : null;
+  // Managers + owner see real STORE totals (the team aggregate) + the store active-lead pipeline.
+  const team = elevated ? getTeam() : null;
+  const store = elevated ? getStoreLeads() : null;
   const board = currentMonthBoard();
   const months = getMetrics();
   const signals = getSignals();
@@ -181,16 +183,16 @@ export default function Dashboard() {
             <StatCard ico={<ClipboardList />} label="Your per-unit" value={myStats && myStats.units ? money(myStats.gross / myStats.units) : "—"} sub="Avg this month" />
             <StatCard ico={<Trophy />} label="Your rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="By CRM-attributed gross" />
           </div>
-          <div className="board-section-label">Store — month-to-date</div>
         </>
       )}
+      {team && <div className="board-section-label">Store — month-to-date</div>}
       {team ? (
         // Real store-wide totals (every rep summed) — what managers and the owner actually want.
         <div className="grid cols-4">
           <StatCard ico={<Car />} label="Store units MTD" value={String(team.totals.units)} sub={`${team.totals.newU}N / ${team.totals.usedU}U · ${team.totals.reps} sellers`} />
           <StatCard ico={<DollarSign />} label="Store gross MTD" value={money(team.totals.gross)} sub="CRM-attributed, all reps" />
           <StatCard ico={<ClipboardList />} label="Store per-unit" value={team.totals.units ? money(team.totals.gross / team.totals.units) : "—"} sub="Avg across the floor" />
-          <StatCard ico={<MailOpen />} label="COVE leads" value={String(team.totals.leads)} sub="Attributed lead activity" />
+          <StatCard ico={<Inbox />} label="Active leads" value={store ? store.activeTotal.toLocaleString() : "—"} sub="Store CRM pipeline" />
         </div>
       ) : (
         <div className="grid cols-4">

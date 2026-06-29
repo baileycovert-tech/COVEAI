@@ -25,6 +25,7 @@ const NAV: NavEntry[] = [
   { href: "/outreach", label: "AI Outreach", Icon: Sparkles },
   { href: "/blast", label: "Blast", Icon: Megaphone },
   { section: "Know" },
+  { href: "/team", label: "Team", Icon: Users, admin: true },
   { href: "/inventory", label: "Inventory", Icon: Car },
   { href: "/metrics", label: "Metrics", Icon: TrendingUp },
   { href: "/health", label: "Data Health", Icon: Activity, admin: true },

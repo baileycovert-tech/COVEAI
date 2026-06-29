@@ -205,6 +205,9 @@ a { color: inherit; text-decoration: none; }
 .team-table td { padding: 8px 10px; border-bottom: 1px solid hsl(var(--border-soft)); white-space: nowrap; }
 .team-table tbody tr:hover { background: hsl(var(--muted) / .4); }
 .team-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.team-table .team-link { color: inherit; font-weight: 600; }
+.team-table .team-link:hover { color: hsl(var(--primary)); text-decoration: underline; }
+.team-table tbody tr.team-row { cursor: default; }
 .card-link:hover { text-decoration: underline; }
 
 /* ---------- Stat ---------- */
