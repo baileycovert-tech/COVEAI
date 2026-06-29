@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
-import { getOutreachQueue, getOutreachTargets, writeData } from "../../../lib/data";
+import { getOutreachQueue, outreachTargetsFor, writeData } from "../../../lib/data";
 import { lookupContact } from "../../../lib/contacts";
 import { getOverride } from "../../../lib/overrides";
 import { currentUser } from "../../../lib/auth";
@@ -35,6 +35,8 @@ const mask = (s: string) =>
     : s.replace(/.(?=.{4})/g, "•");
 
 export async function POST(req: NextRequest) {
+  const me = currentUser();
+  if (!me) return NextResponse.json({ error: "Not signed in" }, { status: 403 });
   const { id } = await req.json();
   const queue = getOutreachQueue();
   const draft = queue.find((d) => d.id === id);
@@ -45,16 +47,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Approve the draft before sending." }, { status: 400 });
   }
 
-  // getOutreachTargets already enriches phone/email from the 35k contacts index.
-  const customer = getOutreachTargets().find((c) => c.slug === draft.slug);
+  // Viewer-scoped audience (enriches phone/email). A rep resolves only their own customers.
+  const customer = outreachTargetsFor(me).find((c) => c.slug === draft.slug);
   let recipient = draft.channel === "email" ? customer?.email : customer?.phone;
-  // Last-ditch: a manual override Bailey typed, then the contacts index
-  // (covers a draft made before enrichment).
+  // Last-ditch: a manual override the rep typed, then — for the owner only — the 35k contacts index.
   if (!recipient) {
     const ov = getOverride(customer?.name || draft.customer);
     recipient = draft.channel === "email" ? ov?.email || undefined : ov?.phone || undefined;
   }
-  if (!recipient) {
+  if (!recipient && me.isAdmin) {
     const hit = lookupContact(customer?.name || draft.customer, customer?.phone);
     recipient = draft.channel === "email" ? hit?.email : hit?.phone;
   }
@@ -68,9 +69,8 @@ export async function POST(req: NextRequest) {
   // Email goes out from the SIGNED-IN rep's own Gmail when they've linked it in Setup.
   let env: NodeJS.ProcessEnv | undefined;
   if (draft.channel === "email") {
-    const me = currentUser();
-    const cred = me ? getSending(me.slug) : null;
-    if (cred) env = { ...process.env, COVE_SMTP_USER: cred.gmailUser, COVE_SMTP_PASS: cred.appPassword, COVE_SMTP_NAME: me!.name };
+    const cred = getSending(me.slug);
+    if (cred) env = { ...process.env, COVE_SMTP_USER: cred.gmailUser, COVE_SMTP_PASS: cred.appPassword, COVE_SMTP_NAME: me.name };
   }
   const result = await runSend(draft.channel, recipient, draft.subject || "", draft.body, env);
   if (!result.ok) {

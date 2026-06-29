@@ -166,7 +166,7 @@ export default function Dashboard() {
         sub={`Month-to-date — ${profile.currentMonthLabel || board.label} · data through ${(profile.dataThrough || "").slice(5) || "today"}`}
         right={<FreshPill {...boardFreshness()} />}
       />
-      <TextLeadBanner />
+      {me?.isAdmin && <TextLeadBanner />}
       <NewLeads leads={myLeads} />
 
       {showPersonal && (
@@ -202,7 +202,7 @@ export default function Dashboard() {
 
       {me?.isAdmin && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
-      {signals.length > 0 && (
+      {me?.isAdmin && signals.length > 0 && (
         <div className="card section-gap">
           <div className="card-head">
             <div className="card-title"><span className="ico"><Radio /></span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>
@@ -232,6 +232,7 @@ export default function Dashboard() {
         <Leaderboard rows={lbRows} meName={me?.name || "Bailey Covert"} />
       </div>
 
+      {me?.isAdmin && (<>
       <div className="grid cols-2 section-gap">
         <div className="card pad-lg">
           <div className="card-head">
@@ -288,6 +289,7 @@ export default function Dashboard() {
           <strong>Coach read:</strong> You closed <strong>{board.units} units</strong> ({board.newUnits} new / {board.usedUnits} used) for {money(board.totalGross)} total gross. You have <strong>{hotLeads.length} hot leads</strong> and <strong>{customers.filter((c) => c.status !== "closed").length} active customers</strong> — work the <a className="card-link" href="/outreach">AI Outreach</a> queue to keep them warm.
         </div>
       </div>
+      </>)}
     </>
   );
 }

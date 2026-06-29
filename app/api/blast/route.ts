@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
-import { getOutreachTargets } from "../../lib/data";
+import { outreachTargetsFor } from "../../lib/data";
 import { lookupContact } from "../../lib/contacts";
 import { currentUser } from "../../lib/auth";
 import { getSending } from "../../lib/user-sending";
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   if (slugs.length > 200) return NextResponse.json({ error: "Max 200 per blast." }, { status: 400 });
   if (!String(template).trim()) return NextResponse.json({ error: "Write the message." }, { status: 400 });
 
-  const targets = getOutreachTargets();
+  const targets = outreachTargetsFor(me);   // a rep can only blast their own audience, never the owner's
   const chosen = new Set(slugs);
   const recips = targets.filter((c) => chosen.has(c.slug));
 

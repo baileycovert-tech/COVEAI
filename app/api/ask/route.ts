@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getInventoryUnits, getDeals, getCustomers, getPipeline, getReps, getOutreachTargets, money } from "../../lib/data";
+import { getInventoryUnits, getDeals, getCustomers, getPipeline, getReps, getOutreachTargets, pipelineFor, outreachTargetsFor, money, type Viewer } from "../../lib/data";
 import { dmsQuery } from "../../lib/dms";
 import { draftMessage } from "../../lib/anthropic";
 import { lookupContact } from "../../lib/contacts";
@@ -29,8 +29,8 @@ function localInventorySearch(query: string) {
   return hit.slice(0, 25).map((u) => ({ stock: u.stock, vin: u.vin, vehicle: `${u.year} ${u.store === "Used" && u.make ? u.make + " " : ""}${u.model} ${u.trim || ""}`.replace(/\s+/g, " ").trim(), color: u.ext && !/^nan$/i.test(u.ext) ? u.ext : "", interior: u.int, internet_price: u.internet ?? u.price, list_price: u.price, mileage: u.mileage, age_days: u.age, status: u.status, store: u.store }));
 }
 
-function crmSnapshot() {
-  const p = getPipeline();
+function crmSnapshot(me: Viewer) {
+  const p = pipelineFor(me);   // viewer-scoped: a rep sees their own pipeline, never the owner's
   const cols = (p.columns || []).map((c: any) => `${c.title}: ${c.leads.length}`).join(", ");
   const hot = (p.columns?.find((c: any) => c.key === "hot")?.leads || []).slice(0, 8).map((l: any) => `${l.name} (${l.vehicle})`).join("; ");
   const reps = getReps();
@@ -81,7 +81,7 @@ const TOOLS = [
   },
 ];
 
-async function runTool(name: string, input: any, restricted = false): Promise<string> {
+async function runTool(name: string, input: any, restricted = false, isAdmin = false): Promise<string> {
   try {
     if (name === "query_dms") {
       if (restricted && FINANCIAL_SQL.test(String(input.sql || ""))) return "REFUSED: " + RESTRICTED_MSG;
@@ -94,6 +94,8 @@ async function runTool(name: string, input: any, restricted = false): Promise<st
       return JSON.stringify(localInventorySearch(String(input.query || "")));
     }
     if (name === "lookup_contact") {
+      // The 35k contacts index is the owner's personal phone book — only the owner/admin may query it.
+      if (!isAdmin) return "Contact lookup isn't available on your login — it only covers your own records.";
       const hit = lookupContact(input.name, input.phone);
       return hit ? JSON.stringify(hit) : "No contact found in the 35k saved contacts for that name/phone.";
     }
@@ -106,13 +108,13 @@ async function runTool(name: string, input: any, restricted = false): Promise<st
 // ---- No-key router: handle the common sales-desk questions with LIVE DMS queries
 // (and the voice-locked template drafter), so the assistant is useful without an LLM. ----
 const OPEN = "lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market')";
-async function routedLookup(question: string, restricted = false): Promise<string | null> {
+async function routedLookup(question: string, restricted = false, me: Viewer = null): Promise<string | null> {
   const ql = question.toLowerCase();
 
   // DRAFT a customer message — voice-locked template. (whole-word name match)
   if (/\b(draft|write|text|message|send|reach out to)\b/.test(ql)) {
     const words = new Set(ql.match(/[a-z]+/g) || []);
-    const targets = getOutreachTargets();
+    const targets = outreachTargetsFor(me);
     const m = targets.find((c) => {
       const parts = c.name.toLowerCase().split(/\s+/).filter((p) => p.length > 2);
       const last = parts[parts.length - 1];
@@ -166,13 +168,16 @@ export async function POST(req: NextRequest) {
   const history: { role: string; text: string }[] = Array.isArray(body.history) ? body.history : [];
   if (!question) return NextResponse.json({ answer: "Ask me anything — deals, leads, inventory, a customer, or 'draft a text to …'." });
 
-  // A salesperson login (not admin/manager) may not pull store financials through COVE.
-  const restricted = !(currentUser()?.seesFinancials);
+  // Viewer scope: a salesperson login (not admin/manager) may not pull store financials, and only
+  // the owner/admin's chatbot may see the owner's pipeline/customers/contacts.
+  const me = currentUser();
+  const restricted = !(me?.seesFinancials);
+  const isAdmin = !!me?.isAdmin;
 
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     // No LLM — route to live DMS for the common questions; tell Bailey how to unlock full chat.
-    const ans = await routedLookup(question, restricted);
+    const ans = await routedLookup(question, restricted, me);
     const tip = "\n\n— (Basic mode. For full back-and-forth like Cowork, add an ANTHROPIC_API_KEY: ./scripts/set-api-key.sh sk-ant-…)";
     return NextResponse.json({ answer: (ans || "I can pull follow-ups, your pace, a stock #, a customer, inventory, or draft a text. Try one of those.") + tip, source: "lookup" });
   }
@@ -189,7 +194,7 @@ export async function POST(req: NextRequest) {
     const policy = restricted
       ? "\n\nACCESS LEVEL — SALESPERSON: full assistant. Help with inventory, their leads/customers, follow-ups, pace, their own sold numbers and gross, and message drafts. The ONLY thing you must NOT reveal is the lot's aggregate INVENTORY VALUE/WORTH or unit COST/margin. If asked for that, reply exactly: \"" + RESTRICTED_MSG + "\" Everything else is fine."
       : "";
-    const system = SYSTEM + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot();
+    const system = SYSTEM + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot(me);
 
     // Agentic tool-use loop.
     for (let i = 0; i < 6; i++) {
@@ -201,7 +206,7 @@ export async function POST(req: NextRequest) {
       }
       messages.push({ role: "assistant", content: resp.content });
       const results = [];
-      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input, restricted) });
+      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input, restricted, isAdmin) });
       messages.push({ role: "user", content: results });
     }
     return NextResponse.json({ answer: "That took too many steps — try narrowing the question.", source: "ai" });
