@@ -16,7 +16,13 @@ COVE_DIST_DIR="$TMP" npm run build
 echo "▸ Build OK — swapping in and restarting (brief blip)…"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 rm -rf .next && mv "$TMP" .next
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+# launchd needs a beat to fully tear down before re-bootstrapping, else it returns EIO (error 5).
+# Wait for the label to disappear, then bootstrap with a couple of retries.
+for i in 1 2 3 4 5; do launchctl list | grep -q "$LABEL\$" || break; sleep 1; done
+for i in 1 2 3; do
+  if launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then break; fi
+  echo "  bootstrap retry $i…"; sleep 2
+done
 
 echo "▸ Health check…"
 for i in $(seq 1 8); do
