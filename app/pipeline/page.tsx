@@ -11,10 +11,10 @@ export const dynamic = "force-dynamic";
 export default function PipelinePage() {
   const me = currentUser();
   if (!me) redirect("/login");
-  // Reps + managers: their own leads (empty until ingested) — never the owner's book.
-  if (!me.isAdmin) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
+  // Plain salespeople: their own leads (empty until ingested). Managers + owner see the whole floor.
+  if (!me.isAdmin && !me.manager) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
 
-  // Admin / owner: the WHOLE-STORE active-lead pipeline, broken out by rep.
+  // Managers + owner: the WHOLE-STORE active-lead pipeline, broken out by rep.
   const store = getStoreLeads();
   const team = getTeam();
   const byRep = team.members

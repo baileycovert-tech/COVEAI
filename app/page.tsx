@@ -97,7 +97,11 @@ export default function Dashboard() {
   const lbRows: any[] = reps.leaderboard || [];
   const myRank = lbRows.find((r) => me && sameName(r.name, me.name));
 
-  const myLeads = me ? getLeadFeed(me.slug) : [];
+  // Managers + owner see the whole floor's newest leads here; a plain rep sees their own.
+  const floorView = !!(me && (me.isAdmin || me.manager));
+  const myLeads = floorView
+    ? getStoreLeads().leads.slice(0, 8).map((l) => ({ at: l.at, source: l.source, customer: l.customer, vehicle: l.vehicle, match: l.rep ? `→ ${l.rep}` : "", urgent: false }))
+    : me ? getLeadFeed(me.slug) : [];
 
   // ---------- SALESMAN (no financial access): that rep's own board only ----------
   if (me && !me.seesFinancials) {
@@ -205,7 +209,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {me?.isAdmin && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
+      {team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
       {me?.isAdmin && signals.length > 0 && (
         <div className="card section-gap">

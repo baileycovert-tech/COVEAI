@@ -13,7 +13,7 @@ export default function BlastPage() {
   if (!me) redirect("/login");
   // Scope the audience to the viewer — a rep only ever blasts their OWN customers, never the
   // shared/owner book. (Empty until their leads ingest, so show the same nudge as the other tools.)
-  if (!me.isAdmin) return (<><PageHead title="Blast" sub="Email your customers" /><RepNudge what="customers to message" /></>);
+  if (!me.isAdmin && !me.manager) return (<><PageHead title="Blast" sub="Email your customers" /><RepNudge what="customers to message" /></>);
   const customers = outreachTargetsFor(me).map((c) => ({
     slug: c.slug, name: c.name, vehicle: c.vehicle_interest || "", stage: c.stage || "",
     hasEmail: !!c.email, hasPhone: !!c.phone, hot: !!c.hot,

@@ -199,7 +199,10 @@ export function getOutreachTargets(repSlug = "bailey-covert"): Customer[] {
 // rep attribution, so it must never appear on another rep's login. Rule: admins (Bailey + the
 // owner) see the full book; every other rep sees ONLY their own slug-attributed leads — which is
 // empty until their own texts/email ingest. This is what keeps one rep's customers off another's.
-export type Viewer = { slug: string; isAdmin: boolean } | null;
+export type Viewer = { slug: string; isAdmin: boolean; manager?: boolean } | null;
+// "Floor" viewers — the owner/admin AND managers — see the WHOLE sales floor's working CRM deals as
+// one combined book. Plain salespeople see only their own slug-attributed leads.
+const seesFloor = (me: Viewer) => !!(me && (me.isAdmin || me.manager));
 
 function leadFeedAsCustomers(slug: string): Customer[] {
   return getLeadFeed(slug).map((l, i) => ({
@@ -212,13 +215,31 @@ function leadFeedAsCustomers(slug: string): Customer[] {
   }));
 }
 
+// The whole floor's active CRM deals (every rep's working leads) as customer records — the manager's
+// "floor as one customer book."
+export function storeCustomers(): Customer[] {
+  return getStoreLeads().leads.map((l, i) => ({
+    slug: "store-" + i + "-" + (l.customer || "x").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name: l.customer || "Lead", phone: null, email: null,
+    vehicle_interest: l.vehicle || "", trade: null,
+    stage: l.rep || "floor", status: "active",
+    last_touch: l.lastTouch || l.at || "", next_step: "", personal: "", source: l.source || "CRM",
+    notes: l.rep ? "Rep: " + l.rep : "", hot: false,
+  }));
+}
+
 export const customersFor = (me: Viewer): Customer[] =>
-  me?.isAdmin ? getCustomers() : me ? leadFeedAsCustomers(me.slug) : [];
+  seesFloor(me) ? storeCustomers() : me ? leadFeedAsCustomers(me.slug) : [];
 
 export function pipelineFor(me: Viewer): Pipeline {
-  if (me?.isAdmin) return getPipeline();
-  const cust = me ? leadFeedAsCustomers(me.slug) : [];
   const toLead = (c: Customer): PipelineLead => ({ name: c.name, vehicle: c.vehicle_interest, note: c.source, phone: c.phone || "" });
+  if (seesFloor(me)) {
+    const sl = getStoreLeads();
+    return { last_refresh: sl.asOf, standing: `${sl.activeTotal} active leads store-wide`, columns: [
+      { key: "working", title: "Working — whole floor", leads: storeCustomers().map(toLead) },
+    ] };
+  }
+  const cust = me ? leadFeedAsCustomers(me.slug) : [];
   return { last_refresh: "", standing: "", columns: [
     { key: "hot", title: "Hot", leads: cust.filter((c) => c.hot).map(toLead) },
     { key: "working", title: "Working", leads: cust.filter((c) => !c.hot).map(toLead) },
@@ -227,7 +248,7 @@ export function pipelineFor(me: Viewer): Pipeline {
 }
 
 export const outreachTargetsFor = (me: Viewer): Customer[] =>
-  me?.isAdmin ? getOutreachTargets("bailey-covert")
+  seesFloor(me) ? storeCustomers()
     : me ? leadFeedAsCustomers(me.slug).filter((c) => c.status !== "closed") : [];
 
 export type RepBoard = { units: number; newU: number; usedU: number; gross: number };
