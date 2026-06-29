@@ -138,6 +138,9 @@ export default function Dashboard() {
   const myStats = me ? reps.bySlug?.[me.slug] : null;
   // Managers and the owner/admin both get a personal "Your numbers" strip above the store board.
   const showPersonal = !!(me && (me.manager || me.isAdmin));
+  // Bailey's legacy personal feeds (his texts/pipeline/signals/recent deals) belong to HIM alone —
+  // not to other admins. The owner sees the STORE + everyone (team table), never Bailey's own book.
+  const isBailey = me?.slug === "bailey-covert";
   // Managers + owner see real STORE totals (the team aggregate) — currentMonthBoard is Bailey's own
   // history, not the store's. The owner (admin) additionally gets the full per-rep team table.
   const team = showPersonal ? getTeam() : null;
@@ -166,7 +169,7 @@ export default function Dashboard() {
         sub={`Month-to-date — ${profile.currentMonthLabel || board.label} · data through ${(profile.dataThrough || "").slice(5) || "today"}`}
         right={<FreshPill {...boardFreshness()} />}
       />
-      {me?.isAdmin && <TextLeadBanner />}
+      {isBailey && <TextLeadBanner />}
       <NewLeads leads={myLeads} />
 
       {showPersonal && (
@@ -202,7 +205,7 @@ export default function Dashboard() {
 
       {me?.isAdmin && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
-      {me?.isAdmin && signals.length > 0 && (
+      {isBailey && signals.length > 0 && (
         <div className="card section-gap">
           <div className="card-head">
             <div className="card-title"><span className="ico"><Radio /></span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>
@@ -232,7 +235,7 @@ export default function Dashboard() {
         <Leaderboard rows={lbRows} meName={me?.name || "Bailey Covert"} />
       </div>
 
-      {me?.isAdmin && (<>
+      {isBailey && (<>
       <div className="grid cols-2 section-gap">
         <div className="card pad-lg">
           <div className="card-head">
