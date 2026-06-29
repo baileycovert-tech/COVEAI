@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Sparkles, KeyRound, Check } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, KeyRound, Check, Maximize2, Minimize2 } from "lucide-react";
 
 type Msg = { role: "you" | "bot"; text: string; source?: string };
 
@@ -13,6 +13,7 @@ const SUGGESTIONS = [
 
 export default function AskWidget() {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,7 +75,9 @@ export default function AskWidget() {
   }
 
   return (
-    <div className="ask-panel">
+    <>
+      {expanded && <div className="ask-overlay" onClick={() => setExpanded(false)} />}
+      <div className={"ask-panel" + (expanded ? " full" : "")}>
       <div className="ask-head">
         <div className="flex" style={{ gap: 8 }}>
           <span style={{ display: "inline-flex", color: "hsl(var(--primary))" }}><Sparkles size={16} /></span>
@@ -84,7 +87,10 @@ export default function AskWidget() {
           </div>
           {hasKey && <span className="badge green" style={{ fontSize: 10 }}><Check size={11} /> Full</span>}
         </div>
-        <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => setOpen(false)} aria-label="Close"><X size={15} /></button>
+        <div className="flex" style={{ gap: 4 }}>
+          <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => setExpanded((e) => !e)} aria-label={expanded ? "Collapse" : "Expand to full screen"} title={expanded ? "Collapse" : "Expand"}>{expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+          <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => setOpen(false)} aria-label="Close"><X size={15} /></button>
+        </div>
       </div>
 
       <div className="ask-body" ref={scroller}>
@@ -127,6 +133,7 @@ export default function AskWidget() {
         <input className="field" placeholder="Ask anything about deals, stock, VINs…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <button className="btn primary" type="submit" disabled={busy || !q.trim()} style={{ padding: "0 12px" }}><Send size={15} /></button>
       </form>
-    </div>
+      </div>
+    </>
   );
 }
