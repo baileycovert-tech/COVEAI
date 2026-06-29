@@ -207,7 +207,7 @@ export default function Dashboard() {
 
       {me?.isAdmin && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
-      {isBailey && signals.length > 0 && (
+      {me?.isAdmin && signals.length > 0 && (
         <div className="card section-gap">
           <div className="card-head">
             <div className="card-title"><span className="ico"><Radio /></span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>

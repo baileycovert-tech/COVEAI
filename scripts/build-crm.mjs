@@ -205,7 +205,7 @@ const columns = COLS.map((c) => ({
 const nNew = columns.find((c) => c.key === "hot")?.leads.length || 0;
 const nWork = columns.find((c) => c.key === "working")?.leads.length || 0;
 const pipeline = {
-  last_refresh: dateOnly(new Date().toISOString()),
+  last_refresh: new Date().toISOString(),  // full timestamp so health grades by the real refresh time
   source: "GMReview scorecard_leads (live, status=Active)",
   standing: `${customers.length} active leads — ${nNew} need first contact, ${nWork} working`,
   columns,

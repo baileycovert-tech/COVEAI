@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"; LABEL="com.covert.crm-store-pipeline"; PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG="$HOME/Library/Logs/covert-crm-store-pipeline.log"; INTERVAL="${1:-10800}"
+LOG="$HOME/Library/Logs/covert-crm-store-pipeline.log"; INTERVAL="${1:-3600}"
 cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

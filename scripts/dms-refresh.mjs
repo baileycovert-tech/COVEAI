@@ -205,6 +205,32 @@ async function main() {
     log("metrics MTD:", entry.newUnits + entry.usedUnits, "units");
   } catch (e) { health.errors.metrics = e.message; log("metrics ERR", e.message); }
 
+  // ---- 3d. LIVE MOVEMENT — store-wide recent sold/funded + newest leads → signals.json ----
+  // (Was orphaned: only the old apply-refresh wrote signals, so the comms feed went stale. Now it
+  //  refreshes every run, store-wide.)
+  try {
+    const veh = (r) => [r.year, r.make, r.model].filter(Boolean).join(" ").trim();
+    const sold = await q(
+      `SELECT customer, sales_rep, year, make, model, stock_number, sold_datetime::text AS at
+       FROM scorecard_leads WHERE sold_datetime IS NOT NULL AND sold_datetime >= (NOW() - INTERVAL '6 days')
+       ORDER BY sold_datetime DESC LIMIT 10`
+    );
+    const fresh = await q(
+      `SELECT customer, sales_rep, lead_source, year, make, model, lead_origination_date::text AS at
+       FROM scorecard_leads WHERE lead_status_type='Active' AND lead_origination_date >= (NOW() - INTERVAL '2 days')
+       ORDER BY lead_origination_date DESC LIMIT 10`
+    );
+    const signals = [
+      ...sold.map((r) => ({ at: r.at, source: "GMReview", who: titleCaseName(r.customer),
+        summary: `${veh(r) || "vehicle"}${r.stock_number ? " " + r.stock_number : ""} sold/funded${r.sales_rep ? " · " + r.sales_rep : ""}`, urgent: false })),
+      ...fresh.map((r) => ({ at: r.at, source: "CRM", who: titleCaseName(r.customer),
+        summary: `New lead — ${veh(r) || "vehicle TBD"} · ${r.lead_source || "CRM"}${r.sales_rep ? " → " + r.sales_rep : ""}`, urgent: true })),
+    ].filter((s) => s.at).sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, 20);
+    write("signals.json", JSON.stringify(signals, null, 2));
+    log("signals:", signals.length);
+    health.ok.signals = signals.length;
+  } catch (e) { health.errors.signals = e.message; log("signals ERR", e.message); }
+
   await client.close();
   clearTimeout(deadline);
 

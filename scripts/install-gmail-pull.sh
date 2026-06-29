@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"; LABEL="com.covert.crm-gmail"; PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG="$HOME/Library/Logs/covert-crm-gmail.log"; INTERVAL="${1:-900}"
+LOG="$HOME/Library/Logs/covert-crm-gmail.log"; INTERVAL="${1:-300}"
 cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
