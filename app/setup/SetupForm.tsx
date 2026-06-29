@@ -29,7 +29,9 @@ export default function SetupForm({ name, s1Ford, s1Chevy, initial, sending }: {
       const d = await r.json();
       if (!d.ok) { setSErr(d.error || "Couldn't save."); return; }
       setLinked(d.sending.hasPassword); setGmailUser(d.sending.gmailUser); setAppPass("");
-      setSMsg(disconnect ? "Disconnected." : "Gmail connected — your email blasts now send from you.");
+      setSMsg(disconnect ? "Disconnected."
+        : d.warn ? `Connected — COVE is reading your inbox. Note: ${d.warn}`
+        : "Connected — COVE now reads your leads and sends email as you.");
     } catch { setSErr("Couldn't reach the server."); }
     finally { setSBusy(false); }
   }
@@ -97,18 +99,18 @@ export default function SetupForm({ name, s1Ford, s1Chevy, initial, sending }: {
         {err && <span style={{ color: "var(--red)", fontSize: 13 }}>{err}</span>}
       </div>
 
-      {/* ---- Send blasts as you ---- */}
+      {/* ---- Connect your email (read leads + send as you) ---- */}
       <div style={{ borderTop: "1px solid hsl(var(--border-soft))", margin: "22px 0 18px" }} />
-      <div className="card-title" style={{ marginBottom: 4 }}><span className="ico"><Send /></span>Send email blasts as you</div>
+      <div className="card-title" style={{ marginBottom: 4 }}><span className="ico"><Mail /></span>Connect your email</div>
       <div className="stat-sub" style={{ marginBottom: 12 }}>
-        Link your Gmail so customer emails and blasts go out <strong>from your address</strong> (replies come to you), not the shop's.
-        Use a Google <a className="card-link" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">App Password</a> (not your login password) — it’s stored only on this Mac.
+        Link your Gmail once and COVE will <strong>read your inbox for new leads</strong> and <strong>send blasts from your address</strong> (replies come straight to you).
+        It uses a Google <em>App Password</em> — a one-off 16-character key, not your login password — stored only on this Mac. We verify it before saving.
       </div>
       {linked && !appPass ? (
         <div className="callout" style={{ marginBottom: 12 }}>
           <span className="ico"><Check /></span>
           <div>
-            <strong>Connected:</strong> {gmailUser} <span className="badge green" style={{ marginLeft: 6 }}>sending on</span>
+            <strong>Connected:</strong> {gmailUser} <span className="badge green" style={{ marginLeft: 6 }}>reading + sending</span>
             <div className="flex gap-sm mt-sm">
               <button className="btn ghost sm" onClick={() => setAppPass(" ")}>Update password</button>
               <button className="btn ghost sm" style={{ color: "var(--red)" }} onClick={() => linkGmail(true)} disabled={sBusy}>Disconnect</button>
@@ -117,10 +119,25 @@ export default function SetupForm({ name, s1Ford, s1Chevy, initial, sending }: {
         </div>
       ) : (
         <>
-          <input className="field" inputMode="email" placeholder="you@gmail.com" value={gmailUser} onChange={(e) => setGmailUser(e.target.value)} style={{ marginBottom: 8 }} />
-          <input className="field" type="password" placeholder="16-character App Password" value={appPass.trim() ? appPass : ""} onChange={(e) => setAppPass(e.target.value)} style={{ marginBottom: 8 }} />
+          {/* Guided steps — so a brand-new employee can do this without help */}
+          <ol className="setup-steps" style={{ margin: "0 0 14px", paddingLeft: 0, listStyle: "none", display: "grid", gap: 8 }}>
+            <li className="flex" style={{ gap: 10, alignItems: "baseline" }}>
+              <span className="step-num">1</span>
+              <span style={{ fontSize: 13 }}>Turn on <a className="card-link" href="https://myaccount.google.com/signinoptions/twosv" target="_blank" rel="noreferrer">2-Step Verification</a> for your Google account (required before you can make an App Password).</span>
+            </li>
+            <li className="flex" style={{ gap: 10, alignItems: "baseline" }}>
+              <span className="step-num">2</span>
+              <span style={{ fontSize: 13 }}>Open <a className="card-link" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">Google App Passwords</a>, type the name <strong>COVE</strong>, and click <strong>Create</strong>.</span>
+            </li>
+            <li className="flex" style={{ gap: 10, alignItems: "baseline" }}>
+              <span className="step-num">3</span>
+              <span style={{ fontSize: 13 }}>Copy the 16-character password Google shows you and paste it below with your email address.</span>
+            </li>
+          </ol>
+          <input className="field" inputMode="email" placeholder="you@covertauto.com (or your Gmail)" value={gmailUser} onChange={(e) => setGmailUser(e.target.value)} style={{ marginBottom: 8 }} />
+          <input className="field" type="password" placeholder="16-character App Password (e.g. abcd efgh ijkl mnop)" value={appPass.trim() ? appPass : ""} onChange={(e) => setAppPass(e.target.value)} style={{ marginBottom: 8 }} />
           <div className="flex gap-sm" style={{ alignItems: "center" }}>
-            <button className="btn primary" onClick={() => linkGmail(false)} disabled={sBusy || !gmailUser.trim()}><Send size={14} /> {sBusy ? "Connecting…" : "Connect Gmail"}</button>
+            <button className="btn primary" onClick={() => linkGmail(false)} disabled={sBusy || !gmailUser.trim() || !appPass.trim()}><Send size={14} /> {sBusy ? "Verifying…" : "Connect email"}</button>
             {sMsg && <span style={{ color: "var(--green)", fontSize: 13 }}>{sMsg}</span>}
             {sErr && <span style={{ color: "var(--red)", fontSize: 13 }}>{sErr}</span>}
           </div>

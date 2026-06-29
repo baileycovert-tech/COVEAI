@@ -1,9 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { spawn } from "child_process";
+import path from "path";
 import { currentUser, getUserBySlug } from "../../lib/auth";
 import { getUserProfile, setUserProfile } from "../../lib/user-profile";
 import { getSendingStatus, setSending } from "../../lib/user-sending";
 
 export const dynamic = "force-dynamic";
+
+// Confirm the App Password actually authenticates (IMAP read + SMTP send) before we save it,
+// so the walkthrough only says "connected" when COVE can truly reach the inbox. Password goes
+// in over stdin — never argv (which is visible in the process list).
+function verifyGmail(user: string, pass: string): Promise<{ ok: boolean; error?: string; warn?: string; smtp?: boolean }> {
+  return new Promise((resolve) => {
+    const script = path.join(process.cwd(), "scripts", "verify-gmail.py");
+    const p = spawn("/usr/bin/python3", [script, user], { stdio: ["pipe", "pipe", "pipe"] });
+    let outBuf = "", errBuf = "";
+    const timer = setTimeout(() => { p.kill(); resolve({ ok: false, error: "Verification timed out reaching Gmail." }); }, 30000);
+    p.stdout.on("data", (d) => (outBuf += d));
+    p.stderr.on("data", (d) => (errBuf += d));
+    p.on("close", () => {
+      clearTimeout(timer);
+      try { resolve(JSON.parse(outBuf.trim().split("\n").pop() || "{}")); }
+      catch { resolve({ ok: false, error: errBuf.trim() || "Couldn't verify the App Password." }); }
+    });
+    p.on("error", (e) => { clearTimeout(timer); resolve({ ok: false, error: `Verifier failed to start: ${e.message}` }); });
+    p.stdin.write(pass); p.stdin.end();
+  });
+}
 
 const cleanPhone = (raw: string): string | null => {
   const d = String(raw || "").replace(/[^\d]/g, "");
@@ -33,12 +56,20 @@ export async function POST(req: NextRequest) {
   if (!me) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
 
-  // Connect/disconnect the rep's Gmail for sending email blasts (separate action from phones/emails).
+  // Connect/disconnect the rep's Gmail so COVE reads their inbox + sends as them (separate action).
   if (body.action === "sending") {
     const gmailUser = String(body.gmailUser || "").trim();
     if (gmailUser && !okEmail(gmailUser)) return NextResponse.json({ error: "Enter a valid Gmail address." }, { status: 400 });
+    // When a NEW password is supplied, prove it authenticates before storing it.
+    const pass = String(body.appPassword || "").trim();
+    let warn: string | undefined;
+    if (gmailUser && pass) {
+      const v = await verifyGmail(gmailUser, pass);
+      if (!v.ok) return NextResponse.json({ error: v.error || "That App Password didn't work." }, { status: 400 });
+      warn = v.warn;
+    }
     const status = setSending(me.slug, gmailUser, body.appPassword);
-    return NextResponse.json({ ok: true, sending: status });
+    return NextResponse.json({ ok: true, sending: status, warn });
   }
 
   const { phones = [], emails = [] } = body;

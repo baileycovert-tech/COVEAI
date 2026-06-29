@@ -19,8 +19,9 @@ data/poll.db
 data/contacts.db
 data/contacts.db-*
 data/_gmail-csv/
-data/_gmail-uid.txt
+data/_gmail-uid*
 data/_gmail-incoming.json
+data/rep-inbox/
 # StoneEagle PDFs + other pulled source docs (PII / business data)
 sources/
 tsconfig.tsbuildinfo

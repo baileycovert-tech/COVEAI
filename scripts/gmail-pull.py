@@ -100,21 +100,39 @@ def parse_stoneeagle(pdf_path: Path):
     log(f"StoneEagle → leaderboard.json ({len(rows)} managers, asOf {asof})")
 
 
-def main():
+def accounts():
+    """Every inbox COVE should scrape: Bailey (primary — CSV + StoneEagle + body leads) plus each
+    rep who linked their Gmail in Setup (data/user-sending.json → body leads attributed to them)."""
     user, pw = app_password()
-    DROP.mkdir(parents=True, exist_ok=True); SE_DIR.mkdir(parents=True, exist_ok=True)
-    last_uid = int(UID_FILE.read_text().strip()) if UID_FILE.exists() else 0
+    accts = [{"slug": "bailey", "user": user, "pw": pw, "primary": True}]
+    sj = DATA / "user-sending.json"
+    if sj.exists():
+        try:
+            for slug, c in json.loads(sj.read_text()).items():
+                u = (c.get("gmailUser") or "").strip()
+                p = (c.get("appPassword") or "").replace(" ", "")
+                if u and p and u.lower() != user.lower():
+                    accts.append({"slug": slug, "user": u, "pw": p, "primary": False})
+        except Exception as e:
+            log("user-sending.json unreadable:", e)
+    return accts
 
+
+def scrape_account(acct):
+    """Pull new lead/report mail for one account. Returns (inbox_leads, n_csv, n_se). Primary also
+    routes CSV attachments + the StoneEagle PDF; reps only contribute body leads (tagged with rep)."""
+    from datetime import timedelta
+    slug, primary = acct["slug"], acct["primary"]
+    uid_file = UID_FILE if primary else (DATA / f"_gmail-uid__{slug}.txt")
+    last_uid = int(uid_file.read_text().strip()) if uid_file.exists() else 0
     try:
-        M = imaplib.IMAP4_SSL(IMAP_HOST)
-        M.login(user, pw)
+        M = imaplib.IMAP4_SSL(IMAP_HOST); M.login(acct["user"], acct["pw"])
     except imaplib.IMAP4.error as e:
-        raise SystemExit(f"IMAP login failed ({e}). Regenerate the Gmail App Password and update data/.gmail-app-password.")
+        log(f"[{slug}] IMAP login failed ({e}) — skipping this inbox"); return [], 0, 0
     M.select("INBOX")
 
-    # Only the senders that carry leads/reports — never scan the whole inbox. First run is
-    # bounded to recent (SINCE); after that the UID watermark keeps it to genuinely-new mail.
-    from datetime import timedelta
+    # Only the senders that carry leads/reports — never scan the whole inbox. First run per account
+    # is bounded to recent (SINCE); after that the per-account UID watermark keeps it to new mail.
     SENDERS = ["motosnap", "stoneeagle", "700credit", "vinsolutions", "autotrader", "cargurus", "carfax", "truecar", "capitalone"]
     since = (datetime.now() - timedelta(days=FIRST_RUN_DAYS)).strftime("%d-%b-%Y")
     uidset = set()
@@ -122,10 +140,9 @@ def main():
         crit = ["FROM", s] + ([] if last_uid else ["SINCE", since])
         typ, data = M.uid("search", None, *crit)
         for u in (data[0].split() if data and data[0] else []):
-            if int(u) > last_uid:
-                uidset.add(int(u))
+            if int(u) > last_uid: uidset.add(int(u))
     uids = [str(u).encode() for u in sorted(uidset)]
-    log(f"login OK · {len(uids)} lead/report messages to process (since UID {last_uid})")
+    log(f"[{slug}] {acct['user']} login OK · {len(uids)} messages (since UID {last_uid})")
 
     inbox_leads, n_csv, n_se, max_uid = [], 0, 0, last_uid
     for uid in uids:
@@ -136,35 +153,65 @@ def main():
         frm, subj = hdr(msg, "From"), hdr(msg, "Subject")
         date = (msg.get("Date") or "")
 
-        # attachments: CSV (leads) + StoneEagle PDF
-        for part in (msg.walk() if msg.is_multipart() else []):
-            fn = part.get_filename()
-            if not fn: continue
-            fn = "".join(p.decode(e or "utf-8", "ignore") if isinstance(p, bytes) else p for p, e in decode_header(fn))
-            payload = part.get_payload(decode=True)
-            if not payload: continue
-            if fn.lower().endswith(".csv"):
-                (DROP / fn).write_bytes(payload); n_csv += 1; log(f"  CSV: {fn}")
-            elif fn.lower().endswith(".pdf") and re.search(r"stoneeagle|ranking", frm + subj, re.I):
-                out = SE_DIR / (datetime.now().strftime("%Y-%m-%d") + ".pdf")
-                out.write_bytes(payload); n_se += 1; parse_stoneeagle(out)
+        # attachments (primary inbox only): CSV lead dumps + StoneEagle PDF
+        if primary:
+            for part in (msg.walk() if msg.is_multipart() else []):
+                fn = part.get_filename()
+                if not fn: continue
+                fn = "".join(p.decode(e or "utf-8", "ignore") if isinstance(p, bytes) else p for p, e in decode_header(fn))
+                payload = part.get_payload(decode=True)
+                if not payload: continue
+                if fn.lower().endswith(".csv"):
+                    (DROP / fn).write_bytes(payload); n_csv += 1; log(f"  CSV: {fn}")
+                elif fn.lower().endswith(".pdf") and re.search(r"stoneeagle|ranking", frm + subj, re.I):
+                    out = SE_DIR / (datetime.now().strftime("%Y-%m-%d") + ".pdf")
+                    out.write_bytes(payload); n_se += 1; parse_stoneeagle(out)
 
-        # body lead emails (skip noise/internal)
+        # body lead emails (skip noise/internal) — attributed to whichever rep's inbox they came from
         if LEAD_SENDERS.search(frm) and not NOISE_SENDERS.search(frm):
-            inbox_leads.append({"message_id": msg.get("Message-ID", uid.decode()), "from": frm, "subject": subj, "body": body_text(msg), "date": date})
+            inbox_leads.append({"message_id": msg.get("Message-ID", uid.decode()), "from": frm,
+                                "subject": subj, "body": body_text(msg), "date": date, "rep": slug})
 
     M.logout()
-    if inbox_leads:
-        (DATA / "_gmail-incoming.json").write_text(json.dumps(inbox_leads, indent=2) + "\n")
-    UID_FILE.write_text(str(max_uid))
+    uid_file.write_text(str(max_uid))
+    return inbox_leads, n_csv, n_se
 
-    # hand off to the existing node ingests
+
+def main():
+    DROP.mkdir(parents=True, exist_ok=True); SE_DIR.mkdir(parents=True, exist_ok=True)
+    accts = accounts()
+    if len(accts) > 1:
+        log(f"scraping {len(accts)} inboxes: " + ", ".join(a["slug"] for a in accts))
+
+    primary_leads, n_csv, n_se = [], 0, 0
+    rep_counts = {}
+    for acct in accts:
+        leads, c, s = scrape_account(acct)
+        if acct["primary"]:
+            primary_leads, n_csv, n_se = leads, c, s
+        elif leads:
+            # Keep reps' personal-inbox leads attributed + separate from Bailey's board until
+            # per-rep lead pipelines consume them. (Most team lead data already arrives, rep-tagged,
+            # via the VinSolutions export in Bailey's inbox.)
+            (DATA / "rep-inbox").mkdir(exist_ok=True)
+            f = DATA / "rep-inbox" / f"{acct['slug']}.json"
+            existing = json.loads(f.read_text()) if f.exists() else []
+            seen_ids = {x.get("message_id") for x in existing}
+            fresh = [l for l in leads if l["message_id"] not in seen_ids]
+            f.write_text(json.dumps(existing + fresh, indent=2) + "\n")
+            rep_counts[acct["slug"]] = len(fresh)
+
+    if primary_leads:
+        (DATA / "_gmail-incoming.json").write_text(json.dumps(primary_leads, indent=2) + "\n")
+
+    # hand off to the existing node ingests (Bailey's board)
     node = "/usr/local/bin/node"
-    if inbox_leads:
+    if primary_leads:
         subprocess.run([node, str(ROOT / "scripts" / "gmail-ingest.mjs")], check=False)
     if n_csv:
         subprocess.run([node, str(ROOT / "scripts" / "gmail-csv-ingest.mjs")], check=False)
-    log(f"done · {len(inbox_leads)} body-leads, {n_csv} CSVs, {n_se} StoneEagle")
+    extra = (" · reps " + ", ".join(f"{k}:{v}" for k, v in rep_counts.items())) if rep_counts else ""
+    log(f"done · {len(primary_leads)} body-leads, {n_csv} CSVs, {n_se} StoneEagle{extra}")
 
 
 if __name__ == "__main__":
