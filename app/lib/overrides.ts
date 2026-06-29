@@ -24,6 +24,24 @@ export function getOverride(name: string): Override | null {
   return readAll()[normName(name)] || null;
 }
 
+// All manually-added/corrected contacts, newest first (for the Contacts page).
+export function getAllOverrides(): Override[] {
+  return Object.values(readAll())
+    .filter((o) => o.phone || o.email)
+    .sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+}
+
+// Remove a manual contact entirely (lets COVE fall back to the contacts index again).
+export function removeOverride(name: string): void {
+  const all = readAll();
+  const key = normName(name);
+  if (all[key]) {
+    delete all[key];
+    fs.mkdirSync(path.dirname(FILE), { recursive: true });
+    fs.writeFileSync(FILE, JSON.stringify(all, null, 2) + "\n");
+  }
+}
+
 // Validate + tidy. Returns null when the value is present but unusable.
 export function cleanPhone(raw?: string | null): string | null {
   if (raw == null || raw === "") return null;

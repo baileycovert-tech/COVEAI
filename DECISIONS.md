@@ -205,3 +205,14 @@ the cross-rooftop **websites MCP** (P1, deferred). So the filter is **multi-sele
 live counts + a "Stock codes" legend, **persisted per-browser** (`localStorage` key
 `cove.inventory.filters.v1`). When P1 lands, add the other-rooftop lots as additional chips/groups.
 *Revisit-if:* a real rooftop/location column appears in the feed — switch `groupOf()` to read it.
+
+### D22 — Contacts page: add/fix a number that wins everywhere (2026-06-29)
+The 35k contacts.db is a static CSV snapshot, so it drifts from Bailey's live phone contacts. Added a
+`/contacts` page (+ `/api/contacts`) to add/correct a contact (name, phone, email) and search what COVE
+currently has. Stored in the existing `contact-overrides.json` (unified — same store the Outreach
+add-contact writes). Key change: `lookupContact()` now checks the override FIRST, so a corrected number
+wins **everywhere** (chatbot, customer pages, outreach, enrichment), not just on the outreach card.
+Phone normalized/validated, removable (falls back to the index). Open to all reps.
+*Sync option (not built):* the Mac's AddressBook DBs ARE present/readable (node has FDA) — a
+`sync-contacts.mjs` could merge them into contacts.db on a schedule; or re-export the CSV and rerun
+build-contacts.mjs. Offered as a follow-up.

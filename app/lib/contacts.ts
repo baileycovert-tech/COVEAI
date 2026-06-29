@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import { getOverride } from "./overrides";
 
 // Read-only lookup over data/contacts.db (built by scripts/build-contacts.mjs from
 // Bailey's ~35k contacts). Fills in a phone/email the CRM record is missing.
@@ -21,6 +22,9 @@ export type ContactHit = { name: string; phone: string; email: string; source: s
 
 // Find a contact by exact phone first (most reliable), then by order-independent name key.
 export function lookupContact(name?: string | null, phone?: string | null): ContactHit | null {
+  // A contact Bailey added/corrected on the Contacts page WINS over the static CSV index.
+  const ov = name ? getOverride(name) : null;
+  if (ov && (ov.phone || ov.email)) return { name: ov.name, phone: ov.phone || "", email: ov.email || "", source: "you added" };
   if (!db) return null;
   try {
     const pn = p10(phone || "");
@@ -37,6 +41,26 @@ export function lookupContact(name?: string | null, phone?: string | null): Cont
     );
   } catch {
     return null;
+  }
+}
+
+// Search the index by name tokens or phone digits — for the Contacts page so Bailey can see
+// what number COVE currently has for someone (and correct it).
+export function searchContacts(q: string, limit = 20): ContactHit[] {
+  if (!db || !q || q.trim().length < 2) return [];
+  try {
+    const pn = p10(q);
+    if (pn) {
+      const r = db.prepare("SELECT name,phone,email,source FROM contacts WHERE phone10=? LIMIT ?").all(pn, limit);
+      if (r.length) return r as ContactHit[];
+    }
+    const terms = q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 1);
+    if (!terms.length) return [];
+    const where = terms.map(() => "LOWER(name) LIKE ?").join(" AND ");
+    const args = terms.map((t) => `%${t}%`);
+    return db.prepare(`SELECT name,phone,email,source FROM contacts WHERE ${where} AND phone10!='' LIMIT ?`).all(...args, limit) as ContactHit[];
+  } catch {
+    return [];
   }
 }
 
