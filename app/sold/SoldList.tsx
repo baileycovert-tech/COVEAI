@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SoldDeal } from "../lib/data";
 
 const money = (n: number) => (n < 0 ? "-" : "") + "$" + Math.abs(Math.round(n)).toLocaleString("en-US");
@@ -29,6 +29,14 @@ export default function SoldList({ deals }: { deals: SoldDeal[] }) {
 
   const monthTotal = useMemo(() => filtered.reduce((n, d) => n + (d.gross || 0), 0), [filtered]);
 
+  // step through months: index in the desc-sorted list (older = +1, newer = -1)
+  const idx = month === "all" ? -1 : months.indexOf(month);
+  const stepMonth = (dir: number) => {
+    if (month === "all") { if (months[0]) { setMonth(months[0]); setLimit(40); } return; }
+    const next = months[idx + dir];
+    if (next) { setMonth(next); setLimit(40); }
+  };
+
   const Chip = ({ on, onClick, children }: any) => (
     <button onClick={onClick} className="pill" style={{ cursor: "pointer", border: on ? "1px solid hsl(var(--primary))" : undefined, color: on ? "hsl(var(--primary))" : undefined }}>{children}</button>
   );
@@ -45,10 +53,12 @@ export default function SoldList({ deals }: { deals: SoldDeal[] }) {
         <input className="field" style={{ paddingLeft: 36 }} placeholder="Search customer, stock #, VIN, vehicle, deal #…" value={q} onChange={(e) => { setQ(e.target.value); setLimit(40); }} />
       </div>
       <div className="flex wrap" style={{ gap: 8, marginBottom: 14, alignItems: "center" }}>
+        <button className="btn ghost sm" onClick={() => stepMonth(+1)} disabled={month !== "all" && idx >= months.length - 1} title="Older month" aria-label="Older month"><ChevronLeft size={15} /></button>
         <select className="field" style={{ width: "auto", padding: "6px 10px", fontWeight: 600 }} value={month} onChange={(e) => { setMonth(e.target.value); setLimit(40); }}>
           <option value="all">All months</option>
           {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
         </select>
+        <button className="btn ghost sm" onClick={() => stepMonth(-1)} disabled={month === "all" || idx <= 0} title="Newer month" aria-label="Newer month"><ChevronRight size={15} /></button>
         <span style={{ width: 1, background: "hsl(var(--border))", alignSelf: "stretch" }} />
         <Chip on={scope === "all"} onClick={() => setScope("all")}>All</Chip>
         <Chip on={scope === "NEW"} onClick={() => setScope("NEW")}>New</Chip>

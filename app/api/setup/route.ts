@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser, getUserBySlug } from "../../lib/auth";
 import { getUserProfile, setUserProfile } from "../../lib/user-profile";
+import { getSendingStatus, setSending } from "../../lib/user-sending";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function GET() {
     name: me.name,
     s1: { ford: u?.fordS1 || null, chevy: u?.chevyS1 || null },
     profile: getUserProfile(me.slug),
+    sending: getSendingStatus(me.slug),
   });
 }
 
@@ -29,7 +31,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const me = currentUser();
   if (!me) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  const { phones = [], emails = [] } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+
+  // Connect/disconnect the rep's Gmail for sending email blasts (separate action from phones/emails).
+  if (body.action === "sending") {
+    const gmailUser = String(body.gmailUser || "").trim();
+    if (gmailUser && !okEmail(gmailUser)) return NextResponse.json({ error: "Enter a valid Gmail address." }, { status: 400 });
+    const status = setSending(me.slug, gmailUser, body.appPassword);
+    return NextResponse.json({ ok: true, sending: status });
+  }
+
+  const { phones = [], emails = [] } = body;
 
   const cleanPhones: string[] = [];
   for (const p of (Array.isArray(phones) ? phones : []).filter((x) => String(x).trim())) {

@@ -5,17 +5,19 @@ import path from "path";
 import { getOutreachQueue, getOutreachTargets, writeData } from "../../../lib/data";
 import { lookupContact } from "../../../lib/contacts";
 import { getOverride } from "../../../lib/overrides";
+import { currentUser } from "../../../lib/auth";
+import { getSending } from "../../../lib/user-sending";
 
 export const dynamic = "force-dynamic";
 
 const SEND_SCRIPT = path.join(process.cwd(), "scripts", "send.py");
 
-function runSend(channel: string, recipient: string, subject: string, body: string): Promise<{ ok: boolean; error?: string; to?: string }> {
+function runSend(channel: string, recipient: string, subject: string, body: string, env?: NodeJS.ProcessEnv): Promise<{ ok: boolean; error?: string; to?: string }> {
   const args = channel === "email"
     ? [SEND_SCRIPT, "email", recipient, subject || "", body]
     : [SEND_SCRIPT, "imessage", recipient, body];
   return new Promise((resolve) => {
-    execFile("python3", args, { timeout: 40000 }, (err, stdout) => {
+    execFile("python3", args, { timeout: 40000, env: env || process.env }, (err, stdout) => {
       const line = (stdout || "").trim().split("\n").pop() || "";
       try {
         const parsed = JSON.parse(line);
@@ -63,7 +65,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await runSend(draft.channel, recipient, draft.subject || "", draft.body);
+  // Email goes out from the SIGNED-IN rep's own Gmail when they've linked it in Setup.
+  let env: NodeJS.ProcessEnv | undefined;
+  if (draft.channel === "email") {
+    const me = currentUser();
+    const cred = me ? getSending(me.slug) : null;
+    if (cred) env = { ...process.env, COVE_SMTP_USER: cred.gmailUser, COVE_SMTP_PASS: cred.appPassword, COVE_SMTP_NAME: me!.name };
+  }
+  const result = await runSend(draft.channel, recipient, draft.subject || "", draft.body, env);
   if (!result.ok) {
     return NextResponse.json({ error: result.error || "Send failed" }, { status: 502 });
   }

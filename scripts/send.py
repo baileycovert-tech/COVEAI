@@ -89,12 +89,21 @@ def send_email(recipient: str, subject: str, body: str):
     recipient = recipient.strip()
     if not recipient or "@" not in recipient:
         out(False, "No valid email address on file for this customer.")
-    user, password = load_app_password()
+    # Prefer the signed-in rep's own Gmail (passed via env so the password never lands in argv);
+    # fall back to the shared deal-mailer credential.
+    import os
+    user = os.environ.get("COVE_SMTP_USER", "").strip()
+    password = os.environ.get("COVE_SMTP_PASS", "").strip()
+    sender_name = os.environ.get("COVE_SMTP_NAME", "").strip()
+    if not (user and password):
+        user, password = load_app_password()
+        sender_name = "Bailey Covert"
     msg = EmailMessage()
-    msg["From"] = f"Bailey Covert <{user}>"
+    msg["From"] = f"{sender_name} <{user}>" if sender_name else user
     msg["To"] = recipient
     msg["Subject"] = subject or "Following up — Covert"
-    msg["Reply-To"] = "baileycovert@covertauto.com"
+    if not os.environ.get("COVE_SMTP_USER"):
+        msg["Reply-To"] = "baileycovert@covertauto.com"
     msg.set_content(body)
     try:
         ctx = ssl.create_default_context()
