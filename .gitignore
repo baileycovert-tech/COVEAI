@@ -30,3 +30,7 @@ tsconfig.tsbuildinfo
 # deal-jacket blanks (large binaries) + filled output
 templates/
 data/filled-packets/
+
+# one-time roster migration (embeds employee numbers) + login-table backups
+scripts/merge-employees.mjs
+data/users.json.bak-*

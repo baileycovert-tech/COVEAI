@@ -256,3 +256,13 @@ finance." Chosen flow: **approve in COVE, then it sends** (one-tap gate before e
   Desk approved → send to finance → Mark funded. Nothing leaves until the rep approves in-app.
 - Verified end-to-end in preview (build fills a real packet, list renders, PDF preview serves). Real
   sends not fired in test (they email live coworkers); the SMTP path is the already-auth-verified cred.
+
+## Full sales-floor login roster (2026-06-29)
+*Why:* "every employee needs to have access." Pulled the DMS `employees` roster (role IN
+sales / Sales Manager) and merged into the COVE login table (data/users.json). All 57 salespeople
+were already present (deduped by employee number); the gap was the **11 sales managers**, now added
+with `manager: true` (store-financial visibility). Login credential = employee number, sha256-hashed
+(both rooftop numbers hashed so either works). DMS column map: store_03_01 = Chevy #, store_04_01 =
+Ford #. Roster now 65 users (1 admin, 11 managers, 53 reps); change is live immediately (login page
+is force-dynamic, reads users.json fresh). The migration script + login-table backup hold employee
+numbers/hashes, so both are gitignored (PII stays out of version control, per project norm).
