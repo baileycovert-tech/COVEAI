@@ -200,9 +200,13 @@ export function getOutreachTargets(repSlug = "bailey-covert"): Customer[] {
 // owner) see the full book; every other rep sees ONLY their own slug-attributed leads — which is
 // empty until their own texts/email ingest. This is what keeps one rep's customers off another's.
 export type Viewer = { slug: string; isAdmin: boolean; manager?: boolean } | null;
-// "Floor" viewers — the owner/admin AND managers — see the WHOLE sales floor's working CRM deals as
-// one combined book. Plain salespeople see only their own slug-attributed leads.
-const seesFloor = (me: Viewer) => !!(me && (me.isAdmin || me.manager));
+// Role model for the CRM views:
+//   • Bailey      → his OWN book/leads (he runs COVE but works his own deals; "just my leads").
+//   • Other reps  → their own slug-attributed leads.
+//   • Managers    → the WHOLE floor's working deals.
+//   • Owner Chance→ the whole floor / everything.
+const isBaileyV = (me: Viewer) => me?.slug === "bailey-covert";
+const seesFloor = (me: Viewer) => !!(me && (me.manager || (me.isAdmin && !isBaileyV(me))));
 
 function leadFeedAsCustomers(slug: string): Customer[] {
   return getLeadFeed(slug).map((l, i) => ({
@@ -229,10 +233,13 @@ export function storeCustomers(): Customer[] {
 }
 
 export const customersFor = (me: Viewer): Customer[] =>
-  seesFloor(me) ? storeCustomers() : me ? leadFeedAsCustomers(me.slug) : [];
+  isBaileyV(me) ? getCustomers()
+    : seesFloor(me) ? storeCustomers()
+    : me ? leadFeedAsCustomers(me.slug) : [];
 
 export function pipelineFor(me: Viewer): Pipeline {
   const toLead = (c: Customer): PipelineLead => ({ name: c.name, vehicle: c.vehicle_interest, note: c.source, phone: c.phone || "" });
+  if (isBaileyV(me)) return getPipeline();   // Bailey works his own pipeline
   if (seesFloor(me)) {
     const sl = getStoreLeads();
     return { last_refresh: sl.asOf, standing: `${sl.activeTotal} active leads store-wide`, columns: [
@@ -248,7 +255,8 @@ export function pipelineFor(me: Viewer): Pipeline {
 }
 
 export const outreachTargetsFor = (me: Viewer): Customer[] =>
-  seesFloor(me) ? storeCustomers()
+  isBaileyV(me) ? getOutreachTargets("bailey-covert")
+    : seesFloor(me) ? storeCustomers()
     : me ? leadFeedAsCustomers(me.slug).filter((c) => c.status !== "closed") : [];
 
 export type RepBoard = { units: number; newU: number; usedU: number; gross: number; front?: number; back?: number };

@@ -21,6 +21,24 @@ const CHATDB = path.join(process.env.HOME, "Library", "Messages", "chat.db");
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const APPLE_EPOCH_MS = 978307200000; // 2001-01-01 in ms since 1970
 
+// Modern macOS stores most message text in `attributedBody` (a typedstream NSAttributedString blob),
+// leaving `message.text` NULL — so filtering on text IS NOT NULL silently drops ~60% of inbound,
+// including lead notifications. Decode the plain text out of the blob.
+function decodeAttributedBody(buf) {
+  if (!buf || !buf.length) return "";
+  const i = buf.indexOf("NSString");
+  if (i < 0) return "";
+  let p = i + 8;
+  const plus = buf.indexOf(0x2b, p);              // '+' precedes the length
+  p = (plus >= 0 && plus < p + 12 ? plus : p) + 1;
+  let len = buf[p]; p += 1;
+  if (len === 0x81) { len = buf.readUInt16LE(p); p += 2; }
+  else if (len === 0x82) { len = buf.readUInt32LE(p); p += 4; }
+  if (!len || len > buf.length - p) return "";
+  const t = buf.slice(p, p + len).toString("utf8");
+  return /[\x20-\x7E]/.test(t) ? t : "";          // must contain printable content
+}
+
 let chat;
 try {
   chat = new Database(CHATDB, { readonly: true, fileMustExist: true });
@@ -37,22 +55,29 @@ const last = Number(getMeta("last_rowid") || 0);
 
 // inbound messages newer than the watermark, with the contact's phone/email
 const rows = chat.prepare(`
-  SELECT m.ROWID AS rowid, m.text AS text, m.date AS adate, m.is_from_me AS mine, h.id AS sender
+  SELECT m.ROWID AS rowid, m.text AS text, m.attributedBody AS abody, m.date AS adate, m.is_from_me AS mine, h.id AS sender
   FROM message m LEFT JOIN handle h ON m.handle_id = h.ROWID
-  WHERE m.ROWID > ? AND m.is_from_me = 0 AND m.text IS NOT NULL
-  ORDER BY m.ROWID ASC LIMIT 500
+  WHERE m.ROWID > ? AND m.is_from_me = 0 AND (m.text IS NOT NULL OR m.attributedBody IS NOT NULL)
+  ORDER BY m.ROWID ASC LIMIT 1500
 `).all(last);
 chat.close();
 
 if (!rows.length) { log("tail: no new messages"); meta.close(); process.exit(0); }
 
-const inbox = rows.map((r) => ({
-  rowid: r.rowid,
-  content: r.text,
-  date: new Date(r.adate / 1e6 + APPLE_EPOCH_MS).toISOString(),
-  sender: r.sender || "unknown",
-  is_from_me: false,
-}));
+const advanceTo = rows[rows.length - 1].rowid; // advance past EVERY row we examined (incl. reactions)
+const inbox = rows
+  .map((r) => ({
+    rowid: r.rowid,
+    content: (r.text && r.text.trim()) ? r.text : decodeAttributedBody(r.abody),
+    date: new Date(r.adate / 1e6 + APPLE_EPOCH_MS).toISOString(),
+    sender: r.sender || "unknown",
+    is_from_me: false,
+  }))
+  .filter((m) => m.content && m.content.trim()); // drop reactions/tapbacks with no text
+
+// If this batch was ALL reactions/no-text, just advance the watermark past them — no ingest needed.
+if (!inbox.length) { setMeta.run("last_rowid", String(advanceTo)); log(`tail: ${rows.length} non-text rows skipped (advanced to ${advanceTo})`); meta.close(); process.exit(0); }
+
 // Write the inbox SYNCHRONOUSLY and confirm it landed BEFORE running ingest — otherwise
 // ingest races against a not-yet-written file and processes the stale inbox.
 fs.writeFileSync(path.join(DATA, "_imessage-incoming.json"), JSON.stringify(inbox, null, 2) + "\n");
@@ -61,8 +86,8 @@ fs.writeFileSync(path.join(DATA, "_imessage-incoming.json"), JSON.stringify(inbo
 // next run instead of skipping them. (ingest's own per-row dedup makes the re-feed a no-op.)
 try {
   execFileSync(process.execPath, [path.join(ROOT, "scripts", "imessage-ingest.mjs")], { encoding: "utf8", stdio: "inherit" });
-  setMeta.run("last_rowid", String(rows[rows.length - 1].rowid));
-  log(`tail: fed ${inbox.length} new messages (rowids ${rows[0].rowid}..${rows[rows.length - 1].rowid})`);
+  setMeta.run("last_rowid", String(advanceTo));
+  log(`tail: fed ${inbox.length} new messages (advanced to ${advanceTo})`);
 } catch (e) {
   log("ingest err — watermark NOT advanced, will retry next run:", e.message);
 } finally {

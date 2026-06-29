@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "../lib/auth";
-import { getStoreLeads, getTeam } from "../lib/data";
+import { getStoreLeads, getTeam, getPipeline } from "../lib/data";
+import { getRemoved } from "../lib/leads-state";
 import { PageHead, LivePill } from "../components/ui";
 import RepNudge from "../components/RepNudge";
+import PipelineClient from "./PipelineClient";
 import { Inbox, Users, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +13,20 @@ export const dynamic = "force-dynamic";
 export default function PipelinePage() {
   const me = currentUser();
   if (!me) redirect("/login");
-  // Plain salespeople: their own leads (empty until ingested). Managers + owner see the whole floor.
+  // Plain salespeople: their own leads (empty until ingested).
   if (!me.isAdmin && !me.manager) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
+
+  // Bailey: HIS own pipeline (his leads, not the floor's).
+  if (me.slug === "bailey-covert") {
+    const p = getPipeline();
+    const total = p.columns.reduce((n, c) => n + c.leads.length, 0);
+    return (
+      <>
+        <PageHead title="Pipeline" sub={`${total} of your leads in motion · ${p.standing}`} right={<LivePill text={`Refreshed ${(p.last_refresh || "").slice(0, 10) || "live"}`} />} />
+        <PipelineClient columns={p.columns as any} removed={getRemoved()} />
+      </>
+    );
+  }
 
   // Managers + owner: the WHOLE-STORE active-lead pipeline, broken out by rep.
   const store = getStoreLeads();

@@ -97,8 +97,9 @@ export default function Dashboard() {
   const lbRows: any[] = reps.leaderboard || [];
   const myRank = lbRows.find((r) => me && sameName(r.name, me.name));
 
-  // Managers + owner see the whole floor's newest leads here; a plain rep sees their own.
-  const floorView = !!(me && (me.isAdmin || me.manager));
+  // Bailey works his OWN leads ("just my leads"); managers + the owner see the whole floor's leads.
+  const isBailey = me?.slug === "bailey-covert";
+  const floorView = !!(me && (me.manager || (me.isAdmin && !isBailey)));
   const myLeads = floorView
     ? getStoreLeads().leads.slice(0, 8).map((l) => ({ at: l.at, source: l.source, customer: l.customer, vehicle: l.vehicle, match: l.rep ? `→ ${l.rep}` : "", urgent: false }))
     : me ? getLeadFeed(me.slug) : [];
@@ -144,10 +145,8 @@ export default function Dashboard() {
   // The "Your month-to-date" strip shows ONLY for an elevated person who actually sells (Bailey, a
   // selling manager). The owner (Chance, no personal sales) gets a pure store view — no empty strip.
   const showPersonal = elevated && !!myStats && ((myStats.units || 0) > 0 || (myStats.gross || 0) > 0);
-  // Bailey's legacy personal feeds (his texts/pipeline/signals/recent deals) belong to HIM alone —
-  // not to other admins. The owner sees the STORE + everyone (team table), never Bailey's own book.
-  const isBailey = me?.slug === "bailey-covert";
-  // Managers + owner see real STORE totals (the team aggregate) + the store active-lead pipeline.
+  // Store metrics show for everyone elevated (incl. Bailey — he wants store metrics + leaderboard).
+  // The team table + floor signals are floorView only (managers + owner, NOT Bailey).
   const team = elevated ? getTeam() : null;
   const store = elevated ? getStoreLeads() : null;
   const board = currentMonthBoard();
@@ -209,9 +208,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
+      {floorView && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
-      {me?.isAdmin && signals.length > 0 && (
+      {floorView && signals.length > 0 && (
         <div className="card section-gap">
           <div className="card-head">
             <div className="card-title"><span className="ico"><Radio /></span>Live movement <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— Gmail · Messages · CRM</span></div>
