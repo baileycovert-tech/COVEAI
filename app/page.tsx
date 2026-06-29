@@ -1,13 +1,14 @@
 import {
   currentMonthBoard, getMetrics, getDeals, getPipeline,
-  getCustomers, getProfile, getSignals, getReps, getLeadFeed, getTextLeads, getImsgStatus, redactPhones, monthTotals, money,
+  getCustomers, getProfile, getSignals, getReps, getTeam, getLeadFeed, getTextLeads, getImsgStatus, redactPhones, monthTotals, money,
 } from "./lib/data";
 import { boardFreshness } from "./lib/health";
 import { currentUser } from "./lib/auth";
 import { PageHead, FreshPill, StatCard, UnitsChart, Avatar } from "./components/ui";
+import TeamTable from "./components/TeamTable";
 import {
   Bell, Car, DollarSign, ClipboardList, Trophy, Radio, BarChart3,
-  Flame, ReceiptText, Lightbulb, Megaphone, CarFront, MessageSquare,
+  Flame, ReceiptText, Lightbulb, Megaphone, CarFront, MessageSquare, MailOpen,
 } from "lucide-react";
 
 function TextLeadBanner() {
@@ -135,7 +136,11 @@ export default function Dashboard() {
   // Managers run the floor, so they see the whole STORE's numbers. But they also want THEIR OWN
   // month-to-date, so for managers we show a personal strip above the store board.
   const myStats = me ? reps.bySlug?.[me.slug] : null;
-  const showPersonal = !!me?.manager;
+  // Managers and the owner/admin both get a personal "Your numbers" strip above the store board.
+  const showPersonal = !!(me && (me.manager || me.isAdmin));
+  // Managers + owner see real STORE totals (the team aggregate) — currentMonthBoard is Bailey's own
+  // history, not the store's. The owner (admin) additionally gets the full per-rep team table.
+  const team = showPersonal ? getTeam() : null;
   const board = currentMonthBoard();
   const months = getMetrics();
   const signals = getSignals();
@@ -176,14 +181,26 @@ export default function Dashboard() {
           <div className="board-section-label">Store — month-to-date</div>
         </>
       )}
-      <div className="grid cols-4">
-        <StatCard ico={<Car />} label="Units MTD" value={String(board.units)}
-          sub={<><span className={"delta " + (unitDelta >= 0 ? "up" : "down")}>{unitDelta >= 0 ? "▲" : "▼"} {Math.abs(unitDelta)} vs {prev?.label}</span> · {board.newUnits}N / {board.usedUnits}U</>}
-          progress={board.unitPct} />
-        <StatCard ico={<DollarSign />} label="Total Gross MTD" value={money(board.totalGross)} sub={<>Goal {money(board.grossGoal)} · {board.grossPct}% there</>} progress={board.grossPct} progressGreen />
-        <StatCard ico={<ClipboardList />} label="Front PVR" value={money(board.frontPvr)} sub={<>F&I PVR {money(board.fiPvr)} per unit</>} />
-        <StatCard ico={<Trophy />} label="Group Rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="June · CRM-attributed" />
-      </div>
+      {team ? (
+        // Real store-wide totals (every rep summed) — what managers and the owner actually want.
+        <div className="grid cols-4">
+          <StatCard ico={<Car />} label="Store units MTD" value={String(team.totals.units)} sub={`${team.totals.newU}N / ${team.totals.usedU}U · ${team.totals.reps} sellers`} />
+          <StatCard ico={<DollarSign />} label="Store gross MTD" value={money(team.totals.gross)} sub="CRM-attributed, all reps" />
+          <StatCard ico={<ClipboardList />} label="Store per-unit" value={team.totals.units ? money(team.totals.gross / team.totals.units) : "—"} sub="Avg across the floor" />
+          <StatCard ico={<MailOpen />} label="COVE leads" value={String(team.totals.leads)} sub="Attributed lead activity" />
+        </div>
+      ) : (
+        <div className="grid cols-4">
+          <StatCard ico={<Car />} label="Units MTD" value={String(board.units)}
+            sub={<><span className={"delta " + (unitDelta >= 0 ? "up" : "down")}>{unitDelta >= 0 ? "▲" : "▼"} {Math.abs(unitDelta)} vs {prev?.label}</span> · {board.newUnits}N / {board.usedUnits}U</>}
+            progress={board.unitPct} />
+          <StatCard ico={<DollarSign />} label="Total Gross MTD" value={money(board.totalGross)} sub={<>Goal {money(board.grossGoal)} · {board.grossPct}% there</>} progress={board.grossPct} progressGreen />
+          <StatCard ico={<ClipboardList />} label="Front PVR" value={money(board.frontPvr)} sub={<>F&I PVR {money(board.fiPvr)} per unit</>} />
+          <StatCard ico={<Trophy />} label="Group Rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="June · CRM-attributed" />
+        </div>
+      )}
+
+      {me?.isAdmin && team && <TeamTable month={team.month} members={team.members} totals={team.totals} />}
 
       {signals.length > 0 && (
         <div className="card section-gap">

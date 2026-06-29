@@ -198,6 +198,58 @@ export type RepBoard = { units: number; newU: number; usedU: number; gross: numb
 export type LeaderRep = { rank: number; name: string; units: number; gross: number };
 export const getReps = () => read("reps.json", { asOf: "", month: "", bySlug: {} as Record<string, RepBoard>, leaderboard: [] as LeaderRep[] } as any);
 
+// ---------- Owner view: the whole sales team, numbers + COVE lead activity + role ----------
+export type TeamMember = {
+  rank: number | null; name: string; slug: string; role: "rep" | "manager" | "admin";
+  units: number; newU: number; usedU: number; gross: number; perUnit: number; leads: number;
+};
+export function getTeam(): { month: string; members: TeamMember[]; totals: { units: number; newU: number; usedU: number; gross: number; leads: number; reps: number } } {
+  const reps = getReps();
+  const bySlug: Record<string, RepBoard> = reps.bySlug || {};
+  const leaderboard: LeaderRep[] = reps.leaderboard || [];
+  const users: any[] = read("users.json", [] as any[]);
+  const csvByRep: Record<string, number> = read("csv-rep-leads.json", { byRep: {} } as any).byRep || {};
+
+  const norm = (s: string) => (s || "").toLowerCase().normalize("NFKD").replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+  const slugify = (s: string) => norm(s).replace(/\s+/g, "-");
+  const roleOf = (slug: string): "rep" | "manager" | "admin" => {
+    const u = users.find((x) => x.slug === slug);
+    return u?.isAdmin ? "admin" : u?.manager ? "manager" : "rep";
+  };
+  // COVE lead activity per rep: VinSolutions attribution (by name) + each rep's scraped inbox (by slug).
+  const leadByName: Record<string, number> = {};
+  for (const [name, n] of Object.entries(csvByRep)) leadByName[norm(name)] = (leadByName[norm(name)] || 0) + (n as number);
+  const inboxBySlug: Record<string, number> = {};
+  try {
+    const dir = path.join(DATA_DIR, "rep-inbox");
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".json")) continue;
+      try { inboxBySlug[f.replace(/\.json$/, "")] = JSON.parse(fs.readFileSync(path.join(dir, f), "utf-8")).length || 0; } catch {}
+    }
+  } catch {}
+
+  const seen = new Set<string>();
+  const members: TeamMember[] = leaderboard.map((r) => {
+    const slug = slugify(r.name);
+    seen.add(slug);
+    const b = bySlug[slug] || { units: r.units, newU: 0, usedU: 0, gross: r.gross };
+    const leads = (leadByName[norm(r.name)] || 0) + (inboxBySlug[slug] || 0);
+    return { rank: r.rank, name: r.name, slug, role: roleOf(slug),
+      units: r.units, newU: b.newU || 0, usedU: b.usedU || 0, gross: r.gross,
+      perUnit: r.units ? Math.round(r.gross / r.units) : 0, leads };
+  });
+  // Managers / staff with no attributed sales this month still belong on the owner's roster.
+  for (const u of users) {
+    if (seen.has(u.slug) || u.isAdmin) continue;
+    if (!u.manager) continue; // only surface managers without sales; reps without sales are inactive noise
+    members.push({ rank: null, name: u.name, slug: u.slug, role: "manager",
+      units: 0, newU: 0, usedU: 0, gross: 0, perUnit: 0, leads: (inboxBySlug[u.slug] || 0) });
+  }
+
+  const totals = members.reduce((a, m) => ({ units: a.units + m.units, newU: a.newU + m.newU, usedU: a.usedU + m.usedU, gross: a.gross + m.gross, leads: a.leads + m.leads, reps: a.reps + 1 }), { units: 0, newU: 0, usedU: 0, gross: 0, leads: 0, reps: 0 });
+  return { month: reps.month || "", members, totals };
+}
+
 // ---------- Derived: current-month sales board ----------
 export function currentMonthBoard() {
   const months = getMetrics();
