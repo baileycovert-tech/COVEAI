@@ -56,11 +56,11 @@ export function getUserBySlug(slug: string): User | null {
 }
 
 // Server-component helper: the logged-in rep (or null). Reads the request cookie.
-export function currentUser(): { slug: string; name: string; isAdmin: boolean; seesFinancials: boolean } | null {
+export function currentUser(): { slug: string; name: string; isAdmin: boolean; manager: boolean; seesFinancials: boolean } | null {
   const s = readSession(cookies().get(COOKIE)?.value);
   if (!s) return null;
   const u = getUserBySlug(s.slug);
-  return { slug: s.slug, name: s.name, isAdmin: !!(u && u.isAdmin), seesFinancials: elevated(u) };
+  return { slug: s.slug, name: s.name, isAdmin: !!(u && u.isAdmin), manager: !!(u && u.manager), seesFinancials: elevated(u) };
 }
 
 // ---- signed session cookie: payload.signature ----

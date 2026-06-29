@@ -131,7 +131,11 @@ export default function Dashboard() {
     );
   }
 
-  // ---------- ADMIN (Bailey): full Drive-log board ----------
+  // ---------- ADMIN (Bailey) + MANAGERS: full store board ----------
+  // Managers run the floor, so they see the whole STORE's numbers. But they also want THEIR OWN
+  // month-to-date, so for managers we show a personal strip above the store board.
+  const myStats = me ? reps.bySlug?.[me.slug] : null;
+  const showPersonal = !!me?.manager;
   const board = currentMonthBoard();
   const months = getMetrics();
   const signals = getSignals();
@@ -159,6 +163,19 @@ export default function Dashboard() {
       />
       <TextLeadBanner />
       <NewLeads leads={myLeads} />
+
+      {showPersonal && (
+        <>
+          <div className="board-section-label">Your month-to-date</div>
+          <div className="grid cols-4" style={{ marginBottom: 18 }}>
+            <StatCard ico={<Car />} label="Your units MTD" value={String(myStats?.units ?? 0)} sub={`${myStats?.newU ?? 0} new / ${myStats?.usedU ?? 0} used`} />
+            <StatCard ico={<DollarSign />} label="Your gross MTD" value={money(myStats?.gross ?? 0)} sub="CRM-attributed" />
+            <StatCard ico={<ClipboardList />} label="Your per-unit" value={myStats && myStats.units ? money(myStats.gross / myStats.units) : "—"} sub="Avg this month" />
+            <StatCard ico={<Trophy />} label="Your rank" value={myRank ? `#${myRank.rank}` : "—"} unit={lbRows.length ? `of ${lbRows.length}` : ""} sub="By CRM-attributed gross" />
+          </div>
+          <div className="board-section-label">Store — month-to-date</div>
+        </>
+      )}
       <div className="grid cols-4">
         <StatCard ico={<Car />} label="Units MTD" value={String(board.units)}
           sub={<><span className={"delta " + (unitDelta >= 0 ? "up" : "down")}>{unitDelta >= 0 ? "▲" : "▼"} {Math.abs(unitDelta)} vs {prev?.label}</span> · {board.newUnits}N / {board.usedUnits}U</>}
