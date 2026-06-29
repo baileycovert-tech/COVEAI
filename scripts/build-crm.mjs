@@ -158,21 +158,31 @@ for (const c of customers) {
 
 // ---- drop leads Bailey clicked out, and anyone already SOLD ----
 // overrides: "remove" = manual click-out, "keep" = never auto-remove (restore beats a sold match).
-// Sold = matched against the booked-deals log (deals.json, customer = last name) by LAST NAME,
-// so a delivered customer falls off the active board automatically — even for text/email/VS leads
-// that don't carry a DMS lead_status. (DMS web leads already drop via the open-leads status filter.)
-// We record exactly what we dropped + why into removed-leads.json so the board can show + restore it.
+// Sold = matched against the FULL sold history (sold.json — 400 days, full customer names) so a lead
+// that's actually an already-sold customer (this month OR a prior one) falls off the active board.
+// Match precisely: exact full name, OR last-name + first-initial (catches "John Smith" ⇄ "J Smith"
+// without false-matching a different "Smith"). Records what + why into removed-leads.json (restorable).
 const overrides = read("lead-overrides.json", {});
-const dealsLog = read("deals.json", []);
-const soldLast = new Set((Array.isArray(dealsLog) ? dealsLog : []).map((d) => normName(d.customer || "")).filter(Boolean));
-const lastNameOf = (full) => { const t = normName(full).split(" "); return t[t.length - 1] || ""; };
+const soldDeals = read("sold.json", { deals: [] }).deals || [];
+const lastNameOf = (k) => { const t = k.split(" ").filter(Boolean); return t[t.length - 1] || ""; };
+const firstInitialOf = (k) => { const t = k.split(" ").filter(Boolean); return (t[0] || "")[0] || ""; };
+const soldFull = new Set(), soldLastInitial = new Set();
+const soldVehicleByName = {};
+for (const d of soldDeals) {
+  const n = normName(d.customer || ""); if (!n) continue;
+  soldFull.add(n);
+  const ln = lastNameOf(n), fi = firstInitialOf(n);
+  if (ln && fi) soldLastInitial.add(ln + "|" + fi);
+  if (!soldVehicleByName[n]) soldVehicleByName[n] = [d.year, d.make, d.model].filter(Boolean).join(" ").trim();
+}
+const isSold = (k) => { const ln = lastNameOf(k), fi = firstInitialOf(k); return soldFull.has(k) || (!!ln && !!fi && soldLastInitial.has(ln + "|" + fi)); };
 const removedLog = [];
 for (let i = customers.length - 1; i >= 0; i--) {
   const c = customers[i];
   const k = normName(c.name);
   if (overrides[k] === "keep") continue;                 // restored — never auto-remove
   if (overrides[k] === "remove") { removedLog.push({ name: c.name, reason: "clicked out" }); customers.splice(i, 1); continue; }
-  if (soldLast.has(lastNameOf(c.name))) { removedLog.push({ name: c.name, reason: "sold" }); customers.splice(i, 1); }
+  if (isSold(k)) { removedLog.push({ name: c.name, reason: "sold", vehicle: soldVehicleByName[k] || "" }); customers.splice(i, 1); }
 }
 const nDropped = removedLog.length;
 write("removed-leads.json", removedLog);
