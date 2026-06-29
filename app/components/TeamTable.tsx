@@ -28,7 +28,8 @@ export default function TeamTable({ month, members, totals }: {
               <th>Employee</th>
               <th className="num">Units</th>
               <th className="num">Gross MTD</th>
-              <th className="num">Per-unit</th>
+              <th className="num">Front PVR</th>
+              <th className="num">F&amp;I PVR</th>
               <th className="num">Active leads</th>
               <th style={{ width: 28 }}></th>
             </tr>
@@ -44,7 +45,8 @@ export default function TeamTable({ month, members, totals }: {
                 </td>
                 <td className="num">{m.units}<span className="muted" style={{ fontSize: 11 }}> {m.newU}N/{m.usedU}U</span></td>
                 <td className="num">{money(m.gross)}</td>
-                <td className="num">{m.units ? money(m.perUnit) : "—"}</td>
+                <td className={"num " + (m.frontPvr < 0 ? "neg" : "")}>{m.units ? money(m.frontPvr) : "—"}</td>
+                <td className="num">{m.units ? money(m.fiPvr) : "—"}</td>
                 <td className="num">
                   {m.activeLeads > 0
                     ? <span style={{ color: "hsl(var(--primary))", fontWeight: 600 }}><Inbox size={12} style={{ verticalAlign: "-2px", marginRight: 3 }} />{m.activeLeads}</span>

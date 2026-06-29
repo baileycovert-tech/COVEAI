@@ -162,18 +162,20 @@ async function main() {
       `SELECT "S1-NUMBER" AS s1, COUNT(*) AS units,
               SUM(CASE WHEN POSITION('NEW' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS new_u,
               SUM(CASE WHEN POSITION('USED' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS used_u,
-              SUM(COALESCE(NULLIF("FRONT-GROSS",'NaN'::numeric), 0) + COALESCE(NULLIF("BACK-GROSS",'NaN'::numeric), 0)) AS gross
+              SUM(COALESCE(NULLIF("FRONT-GROSS",'NaN'::numeric), 0)) AS front,
+              SUM(COALESCE(NULLIF("BACK-GROSS",'NaN'::numeric), 0)) AS back
        FROM sales_pace WHERE "DATE" >= to_char(date_trunc('month', CURRENT_DATE), 'YYYY-MM-DD') GROUP BY "S1-NUMBER"`
     );
     const byS1 = {};
-    for (const r of raw) if (r.s1 != null) byS1[String(r.s1)] = { units: Number(r.units) || 0, newU: Number(r.new_u) || 0, usedU: Number(r.used_u) || 0, gross: Math.round(num(r.gross) || 0) };
+    for (const r of raw) if (r.s1 != null) byS1[String(r.s1)] = { units: Number(r.units) || 0, newU: Number(r.new_u) || 0, usedU: Number(r.used_u) || 0, front: Math.round(num(r.front) || 0), back: Math.round(num(r.back) || 0) };
     const users = JSON.parse(fs.readFileSync(path.join(DATA, "users.json"), "utf8"));
     const bySlug = {}, board = [];
     for (const u of users) {
       const a = byS1[String(u.fordS1)], b = byS1[String(u.chevyS1)];
       const units = (a?.units || 0) + (b?.units || 0);
       if (units <= 0) continue;
-      const rec = { units, newU: (a?.newU || 0) + (b?.newU || 0), usedU: (a?.usedU || 0) + (b?.usedU || 0), gross: (a?.gross || 0) + (b?.gross || 0) };
+      const front = (a?.front || 0) + (b?.front || 0), back = (a?.back || 0) + (b?.back || 0);
+      const rec = { units, newU: (a?.newU || 0) + (b?.newU || 0), usedU: (a?.usedU || 0) + (b?.usedU || 0), front, back, gross: front + back };
       bySlug[u.slug] = rec;
       board.push({ name: u.name, units: rec.units, gross: rec.gross });
     }

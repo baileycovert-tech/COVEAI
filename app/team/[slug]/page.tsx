@@ -55,7 +55,7 @@ export default async function EmployeePage({ params }: { params: { slug: string 
       <div className="grid cols-4">
         <StatCard ico={<Car />} label="Units MTD" value={String(m.units)} sub={`${m.newU}N / ${m.usedU}U`} />
         <StatCard ico={<DollarSign />} label="Gross MTD" value={money(m.gross)} sub="CRM-attributed" />
-        <StatCard ico={<ClipboardList />} label="Per-unit" value={m.units ? money(m.perUnit) : "—"} sub="avg this month" />
+        <StatCard ico={<ClipboardList />} label="PVR per unit" value={m.units ? money(m.perUnit) : "—"} sub={m.units ? `Front ${money(m.frontPvr)} · F&I ${money(m.fiPvr)}` : "front + F&I"} />
         <StatCard ico={<Trophy />} label="Group rank" value={m.rank ? `#${m.rank}` : "—"} unit={rankN ? `of ${rankN}` : ""} sub="by gross" />
       </div>
 

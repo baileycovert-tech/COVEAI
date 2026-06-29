@@ -195,7 +195,7 @@ export default function Dashboard() {
         <div className="grid cols-4">
           <StatCard ico={<Car />} label="Store units MTD" value={String(team.totals.units)} sub={`${team.totals.newU}N / ${team.totals.usedU}U · ${team.totals.reps} sellers`} />
           <StatCard ico={<DollarSign />} label="Store gross MTD" value={money(team.totals.gross)} sub="CRM-attributed, all reps" />
-          <StatCard ico={<ClipboardList />} label="Store per-unit" value={team.totals.units ? money(team.totals.gross / team.totals.units) : "—"} sub="Avg across the floor" />
+          <StatCard ico={<ClipboardList />} label="Store PVR" value={team.totals.units ? money(Math.round(team.totals.gross / team.totals.units)) : "—"} sub={team.totals.units ? `Front ${money(Math.round(team.totals.front / team.totals.units))} · F&I ${money(Math.round(team.totals.back / team.totals.units))}` : "per unit"} />
           <StatCard ico={<Inbox />} label="Active leads" value={store ? store.activeTotal.toLocaleString() : "—"} sub="Store CRM pipeline" />
         </div>
       ) : (

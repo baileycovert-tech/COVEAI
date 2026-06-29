@@ -20,7 +20,7 @@ export default function RepNumbers({ slug, name }: { slug: string; name: string 
       <div className="grid cols-4">
         <StatCard ico={<Car />} label="Units MTD" value={String(units)} sub={`${b?.newU ?? 0}N / ${b?.usedU ?? 0}U · ${perDay}/day`} />
         <StatCard ico={<DollarSign />} label="Your gross MTD" value={money(gross)} sub="CRM-attributed" />
-        <StatCard ico={<ClipboardList />} label="Avg per unit" value={units ? money(Math.round(gross / units)) : "—"} sub="front + F&I" />
+        <StatCard ico={<ClipboardList />} label="PVR per unit" value={units ? money(Math.round(gross / units)) : "—"} sub={units ? `Front ${money(Math.round((b?.front || 0) / units))} · F&I ${money(Math.round((b?.back || 0) / units))}` : "front + F&I"} />
         <StatCard ico={<Trophy />} label="Group rank" value={rank ? `#${rank.rank}` : "—"} unit={(reps.leaderboard || []).length ? `of ${(reps.leaderboard || []).length}` : ""} sub={reps.month || "this month"} />
       </div>
       {!b && (

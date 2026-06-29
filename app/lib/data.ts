@@ -251,7 +251,7 @@ export const outreachTargetsFor = (me: Viewer): Customer[] =>
   seesFloor(me) ? storeCustomers()
     : me ? leadFeedAsCustomers(me.slug).filter((c) => c.status !== "closed") : [];
 
-export type RepBoard = { units: number; newU: number; usedU: number; gross: number };
+export type RepBoard = { units: number; newU: number; usedU: number; gross: number; front?: number; back?: number };
 export type LeaderRep = { rank: number; name: string; units: number; gross: number };
 export const getReps = () => read("reps.json", { asOf: "", month: "", bySlug: {} as Record<string, RepBoard>, leaderboard: [] as LeaderRep[] } as any);
 
@@ -259,6 +259,7 @@ export const getReps = () => read("reps.json", { asOf: "", month: "", bySlug: {}
 export type TeamMember = {
   rank: number | null; name: string; slug: string; role: "rep" | "manager" | "admin";
   units: number; newU: number; usedU: number; gross: number; perUnit: number; leads: number;
+  frontPvr: number; fiPvr: number;       // per-unit front gross + F&I gross (from the sold log)
   activeLeads: number;  // store-wide active CRM leads attributed to this person
 };
 
@@ -288,7 +289,7 @@ export function storeRepName(name: string): string | null {
   for (const rep of Object.keys(getStoreLeads().byRep)) if (repNameMatches(rep, name)) return rep;
   return null;
 }
-export function getTeam(): { month: string; members: TeamMember[]; totals: { units: number; newU: number; usedU: number; gross: number; leads: number; reps: number } } {
+export function getTeam(): { month: string; members: TeamMember[]; totals: { units: number; newU: number; usedU: number; gross: number; front: number; back: number; leads: number; reps: number } } {
   const reps = getReps();
   const bySlug: Record<string, RepBoard> = reps.bySlug || {};
   const leaderboard: LeaderRep[] = reps.leaderboard || [];
@@ -324,17 +325,23 @@ export function getTeam(): { month: string; members: TeamMember[]; totals: { uni
     const leads = (leadByName[norm(r.name)] || 0) + (inboxBySlug[slug] || 0);
     return { rank: r.rank, name: r.name, slug, role: roleOf(slug),
       units: r.units, newU: b.newU || 0, usedU: b.usedU || 0, gross: r.gross,
-      perUnit: r.units ? Math.round(r.gross / r.units) : 0, leads, activeLeads: activeFor(r.name) };
+      perUnit: r.units ? Math.round(r.gross / r.units) : 0,
+      frontPvr: r.units ? Math.round((b.front || 0) / r.units) : 0,
+      fiPvr: r.units ? Math.round((b.back || 0) / r.units) : 0,
+      leads, activeLeads: activeFor(r.name) };
   });
   // Managers / staff with no attributed sales this month still belong on the owner's roster.
   for (const u of users) {
     if (seen.has(u.slug) || u.isAdmin) continue;
     if (!u.manager) continue; // only surface managers without sales; reps without sales are inactive noise
     members.push({ rank: null, name: u.name, slug: u.slug, role: "manager",
-      units: 0, newU: 0, usedU: 0, gross: 0, perUnit: 0, leads: (inboxBySlug[u.slug] || 0), activeLeads: activeFor(u.name) });
+      units: 0, newU: 0, usedU: 0, gross: 0, perUnit: 0, frontPvr: 0, fiPvr: 0, leads: (inboxBySlug[u.slug] || 0), activeLeads: activeFor(u.name) });
   }
 
-  const totals = members.reduce((a, m) => ({ units: a.units + m.units, newU: a.newU + m.newU, usedU: a.usedU + m.usedU, gross: a.gross + m.gross, leads: a.leads + m.leads, reps: a.reps + 1 }), { units: 0, newU: 0, usedU: 0, gross: 0, leads: 0, reps: 0 });
+  // Store front/F&I gross summed straight from the sold-log rep boards (accurate, no rounding drift).
+  const tFront = Object.values(bySlug).reduce((s, b) => s + (b.front || 0), 0);
+  const tBack = Object.values(bySlug).reduce((s, b) => s + (b.back || 0), 0);
+  const totals = members.reduce((a, m) => ({ units: a.units + m.units, newU: a.newU + m.newU, usedU: a.usedU + m.usedU, gross: a.gross + m.gross, front: tFront, back: tBack, leads: a.leads + m.leads, reps: a.reps + 1 }), { units: 0, newU: 0, usedU: 0, gross: 0, front: tFront, back: tBack, leads: 0, reps: 0 });
   return { month: reps.month || "", members, totals };
 }
 
