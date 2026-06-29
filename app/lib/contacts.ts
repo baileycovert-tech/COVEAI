@@ -46,22 +46,37 @@ export function lookupContact(name?: string | null, phone?: string | null): Cont
 
 // Search the index by name tokens or phone digits — for the Contacts page so Bailey can see
 // what number COVE currently has for someone (and correct it).
-export function searchContacts(q: string, limit = 20): ContactHit[] {
+export function searchContacts(q: string, limit = 30): ContactHit[] {
   if (!db || !q || q.trim().length < 2) return [];
+  let rows: ContactHit[] = [];
   try {
     const pn = p10(q);
+    const ql = q.toLowerCase().trim();
     if (pn) {
-      const r = db.prepare("SELECT name,phone,email,source FROM contacts WHERE phone10=? LIMIT ?").all(pn, limit);
-      if (r.length) return r as ContactHit[];
+      rows = db.prepare("SELECT name,phone,email,source FROM contacts WHERE phone10=? LIMIT ?").all(pn, limit) as ContactHit[];
+    } else if (ql.includes("@")) {
+      rows = db.prepare("SELECT name,phone,email,source FROM contacts WHERE LOWER(email) LIKE ? LIMIT ?").all(`%${ql}%`, limit) as ContactHit[];
+    } else {
+      const terms = ql.replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 1);
+      if (!terms.length) return [];
+      const where = terms.map(() => "LOWER(name) LIKE ?").join(" AND ");
+      const args = terms.map((t) => `%${t}%`);
+      // No phone/email filter — every match is findable (incl. the ~23k email-only contacts);
+      // contacts that have a phone are listed first.
+      rows = db.prepare(
+        `SELECT name,phone,email,source FROM contacts WHERE ${where} ORDER BY (phone10!='') DESC, (email!='') DESC LIMIT ?`
+      ).all(...args, limit) as ContactHit[];
     }
-    const terms = q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 1);
-    if (!terms.length) return [];
-    const where = terms.map(() => "LOWER(name) LIKE ?").join(" AND ");
-    const args = terms.map((t) => `%${t}%`);
-    return db.prepare(`SELECT name,phone,email,source FROM contacts WHERE ${where} AND phone10!='' LIMIT ?`).all(...args, limit) as ContactHit[];
   } catch {
-    return [];
+    rows = [];
   }
+  // Overlay any manual correction you've saved, so search shows the up-to-date number/email.
+  return rows.map((r) => {
+    const ov = getOverride(r.name);
+    return ov && (ov.phone || ov.email)
+      ? { name: r.name, phone: ov.phone || r.phone || "", email: ov.email || r.email || "", source: "you updated" }
+      : r;
+  });
 }
 
 export const contactsReady = () => !!db;

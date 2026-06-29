@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q") || "";
   return NextResponse.json({
     ok: true,
-    indexMatches: q ? searchContacts(q, 15) : [],
+    indexMatches: q ? searchContacts(q, 30) : [],
     added: getAllOverrides(),
   });
 }
