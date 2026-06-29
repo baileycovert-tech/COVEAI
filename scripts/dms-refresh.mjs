@@ -163,7 +163,7 @@ async function main() {
               SUM(CASE WHEN POSITION('NEW' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS new_u,
               SUM(CASE WHEN POSITION('USED' IN UPPER(COALESCE("NUO",''))) > 0 THEN 1 ELSE 0 END) AS used_u,
               SUM(COALESCE(NULLIF("FRONT-GROSS",'NaN'::numeric), 0) + COALESCE(NULLIF("BACK-GROSS",'NaN'::numeric), 0)) AS gross
-       FROM sales_pace WHERE "DATE" >= date_trunc('month', CURRENT_DATE)::text GROUP BY "S1-NUMBER"`
+       FROM sales_pace WHERE "DATE" >= to_char(date_trunc('month', CURRENT_DATE), 'YYYY-MM-DD') GROUP BY "S1-NUMBER"`
     );
     const byS1 = {};
     for (const r of raw) if (r.s1 != null) byS1[String(r.s1)] = { units: Number(r.units) || 0, newU: Number(r.new_u) || 0, usedU: Number(r.used_u) || 0, gross: Math.round(num(r.gross) || 0) };
@@ -182,6 +182,28 @@ async function main() {
     health.ok.reps = Object.keys(bySlug).length;
     log("rep boards (by S1):", Object.keys(bySlug).length);
   } catch (e) { health.errors.reps = e.message; log("reps ERR", e.message); }
+
+  // ---- 3c. CURRENT-MONTH METRICS — Bailey's MTD tiles, live from sales_pace by S1 (was stale @ 25) ----
+  try {
+    const rows = await q(
+      `SELECT CASE WHEN POSITION('NEW' IN UPPER(COALESCE("NUO",''))) > 0 THEN 'new' ELSE 'used' END AS k,
+              COUNT(*) AS units,
+              SUM(COALESCE(NULLIF("FRONT-GROSS",'NaN'::numeric), 0)) AS front,
+              SUM(COALESCE(NULLIF("BACK-GROSS",'NaN'::numeric), 0)) AS back
+       FROM sales_pace WHERE "S1-NUMBER" IN ('1249','3001249') AND "DATE" >= to_char(date_trunc('month', CURRENT_DATE), 'YYYY-MM-DD') GROUP BY 1`
+    );
+    const cur = { new: { units: 0, front: 0, back: 0 }, used: { units: 0, front: 0, back: 0 } };
+    for (const r of rows) { const k = r.k === "new" ? "new" : "used"; cur[k] = { units: Number(r.units) || 0, front: Math.round(num(r.front) || 0), back: Math.round(num(r.back) || 0) }; }
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    const entry = { month: ym, label: now.toLocaleString("en-US", { month: "short" }), newUnits: cur.new.units, usedUnits: cur.used.units, newFront: cur.new.front, newBack: cur.new.back, usedFront: cur.used.front, usedBack: cur.used.back };
+    let mf; try { mf = JSON.parse(fs.readFileSync(path.join(DATA, "metrics.json"), "utf8")); } catch { mf = { months: [] }; }
+    const months = Array.isArray(mf.months) ? mf.months : [];
+    if (months.length && months[months.length - 1].month === ym) months[months.length - 1] = entry; else months.push(entry);
+    write("metrics.json", JSON.stringify({ ...mf, asOf: now.toISOString().slice(0, 10), months }, null, 2));
+    health.ok.metrics = entry.newUnits + entry.usedUnits;
+    log("metrics MTD:", entry.newUnits + entry.usedUnits, "units");
+  } catch (e) { health.errors.metrics = e.message; log("metrics ERR", e.message); }
 
   await client.close();
   clearTimeout(deadline);
