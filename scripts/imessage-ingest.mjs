@@ -62,6 +62,15 @@ const customers = [...read("customers.json", []), ...read("wiki-customers.json",
 const byPhone = {};
 for (const c of customers) if (c.phone) byPhone[phone10(c.phone)] = c;
 
+// Resolve an unknown texter's phone → real name from the 58k contacts index, so a lead isn't a
+// nameless "Texter ####" (and can then be matched against the sold list and deduped properly).
+let contactQ = null;
+try {
+  const cdb = new Database(path.join(DATA, "contacts.db"), { readonly: true, fileMustExist: true });
+  contactQ = cdb.prepare("SELECT name FROM contacts WHERE phone10=? AND name<>'' LIMIT 1");
+} catch { contactQ = null; }
+const resolveName = (phone) => { if (!contactQ || !phone) return null; try { return contactQ.get(phone)?.name || null; } catch { return null; } };
+
 const leads = read("imessage-leads.json", []);
 const leadByKey = new Map(leads.map((l) => [l.phone || kebab(l.name), l]));
 const threads = read("imessage-threads.json", {});
@@ -81,7 +90,7 @@ for (const raw of inbox) {
     const existing = leadByKey.get(lk);
     const entry = {
       slug: existing?.slug || "imsg-" + (lk || crypto.randomBytes(3).toString("hex")),
-      name: c.name || existing?.name || "Texter " + (c.phone ? c.phone.slice(-4) : ""),
+      name: c.name || existing?.name || resolveName(c.phone) || "Texter " + (c.phone ? c.phone.slice(-4) : ""),
       phone: c.phone || null, vehicle: c.vehicle || existing?.vehicle || "", source: c.source || "iMessage",
       stock: c.stock || existing?.stock || null, at: msg.date, lastMsg: c.text.slice(0, 160), hot: true, channel: "iMessage",
     };

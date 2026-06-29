@@ -152,6 +152,17 @@ async function main() {
       .map((d) => ({ date: d.date, nuo: d.nuo, yr: String(d.year || ""), make: d.make, model: d.model, customer: d.customer, stock: d.stock, front: d.front, back: d.back, store: d.store }));
     write("deals.json", JSON.stringify(monthDeals, null, 2));
     log("month deals (deals.json):", monthDeals.length);
+
+    // CAREER sold-customer names (full CRM history, no date limit) so build-crm can drop a lead
+    // that's actually someone Bailey already sold AT ANY TIME — not just inside the 400-day window.
+    const career = await q(
+      `SELECT DISTINCT customer FROM scorecard_leads
+       WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0
+         AND (lead_status_type = 'Sold' OR sold_datetime IS NOT NULL)
+         AND customer IS NOT NULL AND customer <> ''`
+    );
+    write("sold-names.json", JSON.stringify(career.map((r) => r.customer)));
+    log("career sold names:", career.length);
   } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
   // ---- 3b. PER-REP BOARDS — EXACT current-month sold by S1 (sales_pace, not name-matched) → reps.json ----

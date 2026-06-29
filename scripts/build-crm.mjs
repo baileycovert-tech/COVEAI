@@ -164,25 +164,31 @@ for (const c of customers) {
 // without false-matching a different "Smith"). Records what + why into removed-leads.json (restorable).
 const overrides = read("lead-overrides.json", {});
 const soldDeals = read("sold.json", { deals: [] }).deals || [];
+const careerSoldNames = read("sold-names.json", []); // FULL career sold-customer names (any time)
 const lastNameOf = (k) => { const t = k.split(" ").filter(Boolean); return t[t.length - 1] || ""; };
 const firstInitialOf = (k) => { const t = k.split(" ").filter(Boolean); return (t[0] || "")[0] || ""; };
 const soldFull = new Set(), soldLastInitial = new Set();
 const soldVehicleByName = {};
-for (const d of soldDeals) {
-  const n = normName(d.customer || ""); if (!n) continue;
+const addSold = (name, vehicle) => {
+  const n = normName(name || ""); if (!n) return;
   soldFull.add(n);
   const ln = lastNameOf(n), fi = firstInitialOf(n);
   if (ln && fi) soldLastInitial.add(ln + "|" + fi);
-  if (!soldVehicleByName[n]) soldVehicleByName[n] = [d.year, d.make, d.model].filter(Boolean).join(" ").trim();
-}
+  if (vehicle && !soldVehicleByName[n]) soldVehicleByName[n] = vehicle;
+};
+for (const d of soldDeals) addSold(d.customer, [d.year, d.make, d.model].filter(Boolean).join(" ").trim());
+for (const name of careerSoldNames) addSold(name);   // anyone sold AT ANY TIME in his career
 const isSold = (k) => { const ln = lastNameOf(k), fi = firstInitialOf(k); return soldFull.has(k) || (!!ln && !!fi && soldLastInitial.has(ln + "|" + fi)); };
 const removedLog = [];
+const keptNames = new Set();   // final de-dupe: one record per customer name
 for (let i = customers.length - 1; i >= 0; i--) {
   const c = customers[i];
   const k = normName(c.name);
-  if (overrides[k] === "keep") continue;                 // restored — never auto-remove
+  if (overrides[k] === "keep") { keptNames.add(k); continue; } // restored — never auto-remove
   if (overrides[k] === "remove") { removedLog.push({ name: c.name, reason: "clicked out" }); customers.splice(i, 1); continue; }
-  if (isSold(k)) { removedLog.push({ name: c.name, reason: "sold", vehicle: soldVehicleByName[k] || "" }); customers.splice(i, 1); }
+  if (isSold(k)) { removedLog.push({ name: c.name, reason: "sold", vehicle: soldVehicleByName[k] || "" }); customers.splice(i, 1); continue; }
+  if (keptNames.has(k)) { removedLog.push({ name: c.name, reason: "duplicate" }); customers.splice(i, 1); continue; } // dupe
+  keptNames.add(k);
 }
 const nDropped = removedLog.length;
 write("removed-leads.json", removedLog);
