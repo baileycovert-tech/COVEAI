@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
           channel,
           intent: `First outreach to a brand-new lead. ${c.notes ? "Inventory match on file: " + c.notes + "." : ""} Open the door and ask for a time.`,
           repName: rep.name,
+          stage: "new",
         });
         const entry: OutreachDraft = {
           id: `auto-${rep.slug}-${norm(c.name)}-${Date.now()}`,

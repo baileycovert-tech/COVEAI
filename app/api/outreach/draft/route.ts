@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { outreachTargetsFor, getOutreachQueue, writeData, OutreachDraft } from "../../../lib/data";
+import { outreachTargetsFor, getOutreachQueue, getThreadForCustomer, writeData, OutreachDraft } from "../../../lib/data";
 import { draftMessage } from "../../../lib/anthropic";
 import { currentUser, getUserBySlug } from "../../../lib/auth";
 
@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
   if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
   const repName = getUserBySlug(me.slug)?.name || undefined; // draft in THIS rep's voice
-  const drafted = await draftMessage({ customer, channel, intent, repName });
+  // Stage-aware: feed the customer's most recent inbound so the draft fits where the deal is.
+  const lastInbound = getThreadForCustomer(customer, me.slug).filter((m) => m.dir === "in").slice(-1)[0]?.text;
+  const drafted = await draftMessage({ customer, channel, intent, repName, lastInbound });
 
   const entry: OutreachDraft = {
     id: `${slug}-${Date.now()}`,

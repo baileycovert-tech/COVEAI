@@ -1,10 +1,14 @@
 import type { Customer } from "./data";
 
+export type SalesStage = "new" | "qualifying" | "working" | "objection" | "closing" | "post-sale";
+
 export type DraftInput = {
   customer: Customer;
   channel: "text" | "email";
   intent: string; // what the rep wants to accomplish
   repName?: string; // the salesperson the message is FROM (defaults to Bailey Covert)
+  stage?: SalesStage;     // where this lead is in the sale (auto-classified if omitted)
+  lastInbound?: string;   // the customer's most recent message, so the draft responds to it
 };
 
 const DEFAULT_REP = "Bailey Covert";
@@ -26,6 +30,29 @@ HARD RULES (never break, even if the goal says otherwise):
 - First name only. No emoji, no Carfax, no photos. Never invent a stock #, VIN, price, name, or date.`;
 }
 
+// Sales-stage playbook (adapted from SalesGPT's stage model → car-sales, COVE guardrails).
+function stageGuidance(stage: SalesStage): string {
+  switch (stage) {
+    case "new": return "NEW LEAD (first touch) — warm intro, reference exactly what they inquired on, one easy ask for a time. Don't overload.";
+    case "qualifying": return "QUALIFYING — they engaged but you don't know their needs yet. Ask ONE question (timeline, must-haves, or trade) and steer toward an in-person visit.";
+    case "working": return "WORKING — answer their question simply, reinforce the vehicle fits, move toward a specific time to come in. No figures over text.";
+    case "objection": return "OBJECTION HANDLING — acknowledge the concern sincerely; do NOT negotiate numbers over text. Invite them in to go over it together so you can earn it, then ask for a time.";
+    case "closing": return "CLOSING — they're ready. Lock a specific day/time, say you'll have everything prepped so it's quick. Confirm; don't re-sell.";
+    case "post-sale": return "POST-SALE — congratulate and build the relationship, NO pitch. Any problem → loop in a manager; only ask for a review once they're clearly happy.";
+  }
+}
+
+// Infer the stage from the customer record + their last message, so the draft fits the moment.
+function classifyStage(c: Customer, lastInbound?: string): SalesStage {
+  if (/sold|deliver|closed|congrat/i.test(c.stage || c.status || "")) return "post-sale";
+  const t = (lastInbound || "").toLowerCase();
+  if (!t.trim()) return "new"; // no reply yet → first touch
+  if (/too (high|much)|expensive|payment|monthly|price|\brate\b|apr|come down|best (you can|price)|knock|think about|need to (talk|check|sleep)|not sure|other dealer|beat (it|that|the)|over my|out of (my )?budget/.test(t)) return "objection";
+  if (/come in|stop by|what time|tomorrow|today|tonight|this (afternoon|evening|week)|appointment|test ?drive|i'?ll take|let'?s do|paperwork|finalize|deposit|when can i (pick|get|come)/.test(t)) return "closing";
+  if (/\?|available|in stock|color|\btrim\b|miles|mileage|year|how much|details|interested|still (have|there|available)/.test(t)) return "working";
+  return "qualifying";
+}
+
 // Tailor the opener to where the lead came from (trade vs shopping vs finance).
 function sourceGuidance(source: string): string {
   const s = (source || "").toLowerCase();
@@ -40,18 +67,20 @@ function buildPrompt(i: DraftInput): string {
   const c = i.customer;
   const repName = i.repName || DEFAULT_REP;
   const repFirst = repName.split(/\s+/)[0];
+  const stage = i.stage || classifyStage(c, i.lastInbound);
   return `${voiceFor(repName, repFirst)}
 
 CUSTOMER CONTEXT (only use what's relevant; never invent facts not listed):
 - Name: ${c.name}
 - Vehicle interest: ${c.vehicle_interest || "unknown"}
 - Trade: ${c.trade || "none noted"}
-- Stage: ${c.stage || "lead"}
+- Pipeline stage: ${c.stage || "lead"}
 - Last touch: ${c.last_touch || "unknown"}
 - Next step on file: ${c.next_step || "unknown"}
 - Rapport notes: ${c.personal || "none"}
 - Summary: ${c.notes || "none"}
 - Lead source: ${c.source || "unknown"} → ${sourceGuidance(c.source || "")}
+- SALES STAGE: ${stage} → ${stageGuidance(stage)}${i.lastInbound ? `\n- Their last message to us: "${i.lastInbound.replace(/\s+/g, " ").slice(0, 240)}" — respond to THIS directly.` : ""}
 
 GOAL OF THIS MESSAGE: ${i.intent || c.next_step || "re-engage and move the deal forward"}
 CHANNEL: ${i.channel}
