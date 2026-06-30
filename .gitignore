@@ -14,6 +14,9 @@ data/.gmail-user
 # runtime data (live refresh churn + customer PII) — not version controlled.
 # The running instance holds the real files on disk; git tracks code only.
 data/*.json
+data/*.md
+data/*.txt
+data/*.csv
 data/.lead-seen.json
 data/poll.db
 data/contacts.db
