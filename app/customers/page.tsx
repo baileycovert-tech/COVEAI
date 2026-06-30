@@ -10,8 +10,39 @@ export const dynamic = "force-dynamic";
 export default function CustomersPage() {
   const me = currentUser();
   if (!me) redirect("/login");
-  // Plain salespeople: their own (empty until ingested).
-  if (!me.isAdmin && !me.manager) return (<><PageHead title="Customers" sub="Your customers" /><RepNudge what="customers" /></>);
+  // Plain salespeople: THEIR OWN leads, scoped to them (never anyone else's). Empty → setup nudge.
+  if (!me.isAdmin && !me.manager) {
+    const mine = customersFor(me);
+    if (mine.length === 0) return (<><PageHead title="Customers" sub="Your customers" /><RepNudge what="customers" /></>);
+    const hot = mine.filter((c) => c.hot);
+    const rest = mine.filter((c) => !c.hot);
+    const RCard = ({ c }: { c: Customer }) => (
+      <div className="card">
+        <div className="flex between">
+          <div className="flex gap-sm">
+            <Avatar name={c.name} />
+            <div>
+              <div className="row-title">{c.name}</div>
+              <div className="row-sub" style={{ maxWidth: 260 }}>{c.vehicle_interest || "—"}</div>
+            </div>
+          </div>
+          {c.hot && <span className="badge hot">Hot</span>}
+        </div>
+        <div className="flex between mt-sm" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>
+          <span className="badge">{c.source || "Lead"}</span>
+          <span>{c.last_touch ? `Opened ${c.last_touch}` : ""}</span>
+        </div>
+      </div>
+    );
+    return (
+      <>
+        <PageHead title="Customers" sub={`Your leads — ${mine.length}${hot.length ? ` · ${hot.length} hot` : ""}`} />
+        {hot.length > 0 && (<><div className="nav-label" style={{ margin: "4px 0 10px" }}>Hot</div><div className="grid cols-3">{hot.map((c, i) => <RCard key={i} c={c} />)}</div></>)}
+        <div className="nav-label" style={{ margin: "22px 0 10px" }}>Your leads</div>
+        <div className="grid cols-3">{rest.map((c, i) => <RCard key={i} c={c} />)}</div>
+      </>
+    );
+  }
 
   // Bailey: HIS own customer book — with rapport + clickable detail.
   if (me.slug === "bailey-covert") {

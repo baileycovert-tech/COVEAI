@@ -276,6 +276,45 @@ async function main() {
     health.ok.signals = signals.length;
   } catch (e) { health.errors.signals = e.message; log("signals ERR", e.message); }
 
+  // ---- 3d. PER-REP LEAD FEEDS — each COVE rep login flagged feed:true in users.json gets THEIR OWN
+  // active leads from the DMS, scoped to them by name (matched on BOTH first + last, case-insensitive,
+  // so "Josh Fowler" never picks up "Patrick Fowler"). Bailey's feed is built by build-crm; this fills
+  // the other app reps. A new rep with no DMS leads yet gets an EMPTY feed — never anyone else's. ----
+  try {
+    const users = JSON.parse(fs.readFileSync(path.join(DATA, "users.json"), "utf8"));
+    const appReps = users.filter((u) => u && u.feed && !u.isAdmin && u.name);
+    if (appReps.length) {
+      let feed = {};
+      try { feed = JSON.parse(fs.readFileSync(path.join(DATA, "lead-feed.json"), "utf8")); } catch {}
+      const esc = (s) => String(s).replace(/'/g, "''");
+      for (const u of appReps) {
+        const toks = String(u.name).trim().split(/\s+/).filter(Boolean);
+        const first = toks[0], lastName = toks[toks.length - 1];
+        if (!first || !lastName) continue;
+        const rows = await q(
+          `SELECT customer, lead_source, year, make, model, stock_number, lead_origination_date::text AS origin
+           FROM scorecard_leads
+           WHERE POSITION(UPPER('${esc(first)}') IN UPPER(COALESCE(sales_rep,''))) > 0
+             AND POSITION(UPPER('${esc(lastName)}') IN UPPER(COALESCE(sales_rep,''))) > 0
+             AND lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market')
+             AND lead_origination_date >= (CURRENT_DATE - INTERVAL '45 days')
+           ORDER BY lead_origination_date DESC LIMIT 60`
+        );
+        feed[u.slug] = rows.map((r) => ({
+          at: String(r.origin || "").slice(0, 10),
+          source: /ask the question/i.test(r.lead_source || "") ? "CRM" : (r.lead_source || "CRM"),
+          customer: r.customer,
+          vehicle: [r.year, r.make, r.model].filter(Boolean).join(" ").trim(),
+          match: r.stock_number ? `stock ${r.stock_number}` : "",
+          urgent: true,
+        }));
+        log(`rep feed ${u.slug}:`, feed[u.slug].length);
+      }
+      fs.writeFileSync(path.join(DATA, "lead-feed.json"), JSON.stringify(feed, null, 2) + "\n");
+      health.ok.repFeeds = appReps.map((u) => u.slug).join(",");
+    }
+  } catch (e) { health.errors.repFeeds = e.message; log("rep-feeds ERR", e.message); }
+
   await client.close();
   clearTimeout(deadline);
 

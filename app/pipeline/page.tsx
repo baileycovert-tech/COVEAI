@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "../lib/auth";
-import { getStoreLeads, getTeam, getPipeline } from "../lib/data";
+import { getStoreLeads, getTeam, getPipeline, pipelineFor } from "../lib/data";
 import { getRemoved } from "../lib/leads-state";
 import { PageHead, LivePill } from "../components/ui";
 import RepNudge from "../components/RepNudge";
@@ -13,8 +13,34 @@ export const dynamic = "force-dynamic";
 export default function PipelinePage() {
   const me = currentUser();
   if (!me) redirect("/login");
-  // Plain salespeople: their own leads (empty until ingested).
-  if (!me.isAdmin && !me.manager) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
+  // Plain salespeople: THEIR OWN pipeline, scoped to them (never the floor's). Empty → setup nudge.
+  if (!me.isAdmin && !me.manager) {
+    const p = pipelineFor(me);
+    const total = p.columns.reduce((n, c) => n + c.leads.length, 0);
+    if (total === 0) return (<><PageHead title="Pipeline" sub="Your leads in motion" /><RepNudge what="leads" /></>);
+    return (
+      <>
+        <PageHead title="Pipeline" sub={`${total} of your leads in motion`} />
+        <div className="grid cols-3" style={{ alignItems: "start" }}>
+          {p.columns.map((col) => (
+            <div className="card pad-lg" key={col.key}>
+              <div className="card-title" style={{ marginBottom: 10 }}>{col.title} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· {col.leads.length}</span></div>
+              {col.leads.length === 0 ? (
+                <div className="stat-sub">—</div>
+              ) : col.leads.map((l, i) => (
+                <div className="row-item" key={i}>
+                  <div className="row-main">
+                    <div className="row-title">{l.name}</div>
+                    <div className="row-sub">{l.vehicle || "—"}{l.note ? <span className="muted"> · {l.note}</span> : null}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   // Bailey: HIS own pipeline (his leads, not the floor's).
   if (me.slug === "bailey-covert") {
