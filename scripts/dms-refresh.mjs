@@ -153,16 +153,36 @@ async function main() {
     write("deals.json", JSON.stringify(monthDeals, null, 2));
     log("month deals (deals.json):", monthDeals.length);
 
-    // CAREER sold-customer names (full CRM history, no date limit) so build-crm can drop a lead
-    // that's actually someone Bailey already sold AT ANY TIME — not just inside the 400-day window.
+    // CAREER sold customers + RICH BUYER CONTEXT (vehicle + sold date) — full CRM history, no date
+    // limit. Two uses: (a) build-crm drops a lead that's actually someone Bailey already sold AT ANY
+    // TIME; (b) the Contacts page shows a browsable rolodex of past buyers with WHAT they bought and
+    // WHEN — not just names. We keep the vehicle + most-recent sold date and count repeat buys.
     const career = await q(
-      `SELECT DISTINCT customer FROM scorecard_leads
+      `SELECT customer, year, make, model, sold_datetime::text AS sold_at
+       FROM scorecard_leads
        WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0
          AND (lead_status_type = 'Sold' OR sold_datetime IS NOT NULL)
          AND customer IS NOT NULL AND customer <> ''`
     );
-    write("sold-names.json", JSON.stringify(career.map((r) => r.customer)));
-    log("career sold names:", career.length);
+    const buyersMap = new Map(); // one card per customer; newest purchase wins, repeat buys counted
+    for (const r of career) {
+      const key = String(r.customer || "").trim().toLowerCase();
+      if (!key) continue;
+      const veh = [r.year, r.make, r.model].filter(Boolean).join(" ").trim();
+      const at = String(r.sold_at || "").slice(0, 10);
+      const cur = buyersMap.get(key);
+      if (!cur) buyersMap.set(key, { name: String(r.customer).trim(), vehicle: veh, soldAt: at, purchases: 1 });
+      else {
+        cur.purchases += 1;
+        if (at && at > (cur.soldAt || "")) { cur.soldAt = at; if (veh) cur.vehicle = veh; }
+        else if (!cur.vehicle && veh) cur.vehicle = veh;
+      }
+    }
+    const buyers = [...buyersMap.values()].sort((a, b) => (b.soldAt || "").localeCompare(a.soldAt || ""));
+    write("sold-names.json", JSON.stringify(buyers.map((b) => b.name))); // unchanged consumer (drop list)
+    write("_buyers.json", JSON.stringify(buyers, null, 2));
+    health.ok.buyers = buyers.length;
+    log("career buyers (w/ context):", buyers.length);
   } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
   // ---- 3b. PER-REP BOARDS — EXACT current-month sold by S1 (sales_pace, not name-matched) → reps.json ----

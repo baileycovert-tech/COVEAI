@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import fs from "fs";
 import path from "path";
 import { getOverride } from "./overrides";
 
@@ -80,6 +81,42 @@ export function searchContacts(q: string, limit = 30): ContactHit[] {
       ? { name: r.name, phone: ov.phone || r.phone || "", email: ov.email || r.email || "", source: "you updated" }
       : r;
   });
+}
+
+export type Buyer = { name: string; vehicle: string; soldAt: string; purchases: number; phone: string; email: string };
+
+// Past buyers (people Bailey has sold) with context — vehicle + sold date — for the Contacts
+// rolodex. Source is data/_buyers.json (built by dms-refresh from the full CRM sold history);
+// each is enriched with the best phone/email we have (your manual corrections win).
+export function getBuyers(): Buyer[] {
+  let raw: any[] = [];
+  try { raw = JSON.parse(fs.readFileSync(path.join(process.cwd(), "data", "_buyers.json"), "utf8")); }
+  catch { return []; }
+  return raw.map((b) => {
+    const hit = lookupContact(b.name, null);
+    return {
+      name: b.name, vehicle: b.vehicle || "", soldAt: b.soldAt || "",
+      purchases: b.purchases || 1, phone: hit?.phone || "", email: hit?.email || "",
+    };
+  });
+}
+
+// Browse the whole index alphabetically, a page at a time — so the Contacts page is a scrollable
+// rolodex, not just a search box. Optional single-letter filter jumps to a section.
+export function browseContacts(offset = 0, limit = 60, letter = ""): { rows: ContactHit[]; total: number } {
+  if (!db) return { rows: [], total: 0 };
+  try {
+    const useLetter = /^[a-z]$/i.test(letter);
+    const where = useLetter ? "WHERE name LIKE ?" : ""; // LIKE is case-insensitive for ASCII
+    const args: any[] = useLetter ? [letter + "%"] : [];
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM contacts ${where}`).get(...args) as any).n as number;
+    const rows = db.prepare(
+      `SELECT name,phone,email,source FROM contacts ${where} ORDER BY name COLLATE NOCASE LIMIT ? OFFSET ?`
+    ).all(...args, limit, offset) as ContactHit[];
+    return { rows, total };
+  } catch {
+    return { rows: [], total: 0 };
+  }
 }
 
 export const contactsReady = () => !!db;
