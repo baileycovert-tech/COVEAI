@@ -59,3 +59,19 @@ export function parseLeadAlert(t) {
   if (!name && !phone) return null;
   return { name: name && titleCase(name.trim()), phone: phone && phone10(phone), vehicle: veh && veh.trim(), stock, source: titleCase(source) };
 }
+
+// Parse a FREEFORM referral text (e.g. from Bailey's dad): "call John Smith 512-555-1234, wants a
+// Tahoe". Pulls out the CUSTOMER's name / phone / vehicle from natural phrasing so a Tier-1 referrer's
+// text becomes a real lead, not a follow-up to the referrer. Heuristic but conservative.
+export function parseReferralLead(raw) {
+  const t = cleanText(raw);
+  const pm = t.match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/); // first 10-digit phone
+  const phone = pm ? phone10(pm[1]) : null;
+  // name after a cue word ("name is / for / call / text / customer / talk to …"), else first "First Last"
+  const cue = t.match(/\b(?:name'?s?|named|customer|client|for|it'?s|this is|talk to|call|text|reach(?: out)?(?: to)?|send(?: it to)?)\s+([A-Z][a-zA-Z'’.-]+(?:\s+[A-Z][a-zA-Z'’.-]+)?)/);
+  let name = cue ? cue[1] : (t.match(/\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b/) || [])[1];
+  // don't let a vehicle word masquerade as a name
+  if (name && VEHICLE.test(name)) name = null;
+  const veh = (t.match(VEHICLE) || [])[0] || "";
+  return { name: name ? titleCase(name.trim()) : null, phone, vehicle: veh };
+}

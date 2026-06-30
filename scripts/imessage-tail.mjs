@@ -39,10 +39,16 @@ function decodeAttributedBody(buf) {
   return /[\x20-\x7E]/.test(t) ? t : "";          // must contain printable content
 }
 
+// Heartbeat for Data Health — written EVERY run so the app can tell "tail is alive but the Mac
+// stopped receiving texts" (newestMessageAt goes stale) from "tail/chat.db is broken".
+const HEALTH = path.join(DATA, "imessage-health.json");
+const writeHealth = (o) => { try { fs.writeFileSync(HEALTH, JSON.stringify({ ranAt: new Date().toISOString(), ...o }, null, 2) + "\n"); } catch {} };
+
 let chat;
 try {
   chat = new Database(CHATDB, { readonly: true, fileMustExist: true });
 } catch (e) {
+  writeHealth({ chatDbReadable: false, error: e.message.split("\n")[0] });
   log("chat.db not readable (grant Full Disk Access). Skipping autonomous tail.", e.message.split("\n")[0]);
   process.exit(0);
 }
@@ -60,9 +66,16 @@ const rows = chat.prepare(`
   WHERE m.ROWID > ? AND m.is_from_me = 0 AND (m.text IS NOT NULL OR m.attributedBody IS NOT NULL)
   ORDER BY m.ROWID ASC LIMIT 1500
 `).all(last);
+// Newest-message timestamps (regardless of direction/content) — the real "is the Mac still
+// receiving texts?" signal — captured before we close chat.db.
+const newestRaw = chat.prepare("SELECT MAX(date) d FROM message").get()?.d;
+const newestInRaw = chat.prepare("SELECT MAX(date) d FROM message WHERE is_from_me = 0").get()?.d;
+const maxRowid = chat.prepare("SELECT MAX(ROWID) r FROM message").get()?.r;
 chat.close();
+const toIso = (d) => (d ? new Date(d / 1e6 + APPLE_EPOCH_MS).toISOString() : null);
+const heartbeat = (extra = {}) => writeHealth({ chatDbReadable: true, newestMessageAt: toIso(newestRaw), newestInboundAt: toIso(newestInRaw), watermark: last, maxRowid: maxRowid || null, ...extra });
 
-if (!rows.length) { log("tail: no new messages"); meta.close(); process.exit(0); }
+if (!rows.length) { heartbeat(); log("tail: no new messages"); meta.close(); process.exit(0); }
 
 const advanceTo = rows[rows.length - 1].rowid; // advance past EVERY row we examined (incl. reactions)
 const inbox = rows
@@ -76,7 +89,7 @@ const inbox = rows
   .filter((m) => m.content && m.content.trim()); // drop reactions/tapbacks with no text
 
 // If this batch was ALL reactions/no-text, just advance the watermark past them — no ingest needed.
-if (!inbox.length) { setMeta.run("last_rowid", String(advanceTo)); log(`tail: ${rows.length} non-text rows skipped (advanced to ${advanceTo})`); meta.close(); process.exit(0); }
+if (!inbox.length) { setMeta.run("last_rowid", String(advanceTo)); heartbeat(); log(`tail: ${rows.length} non-text rows skipped (advanced to ${advanceTo})`); meta.close(); process.exit(0); }
 
 // Write the inbox SYNCHRONOUSLY and confirm it landed BEFORE running ingest — otherwise
 // ingest races against a not-yet-written file and processes the stale inbox.
@@ -87,6 +100,7 @@ fs.writeFileSync(path.join(DATA, "_imessage-incoming.json"), JSON.stringify(inbo
 try {
   execFileSync(process.execPath, [path.join(ROOT, "scripts", "imessage-ingest.mjs")], { encoding: "utf8", stdio: "inherit" });
   setMeta.run("last_rowid", String(advanceTo));
+  heartbeat({ fed: inbox.length });
   log(`tail: fed ${inbox.length} new messages (advanced to ${advanceTo})`);
 } catch (e) {
   log("ingest err — watermark NOT advanced, will retry next run:", e.message);

@@ -19,7 +19,11 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
-import { phone10, kebab, titleCase, cleanText, parseLeadAlert, VEHICLE, BUY, SPAM, TAPBACK, GENERIC_VEH, SELF_NUMBERS, isBrief, isInternalNote } from "./lib-leads.mjs";
+import { phone10, kebab, titleCase, cleanText, parseLeadAlert, parseReferralLead, VEHICLE, BUY, SPAM, TAPBACK, GENERIC_VEH, SELF_NUMBERS, isBrief, isInternalNote } from "./lib-leads.mjs";
+
+// Tier-1 referrers (e.g. Bailey's dad, Chance) — populated from data/referrers.json below. A text
+// FROM one of these numbers is a LEAD about a customer, not a follow-up to the referrer.
+const referrers = {};
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "data");
@@ -44,6 +48,19 @@ function classify(msg, customersByPhone) {
   // direct message from a real contact
   const senderPhone = phone10(msg.sender);
   if (SELF_NUMBERS.has(senderPhone)) return { type: "internal" }; // Bailey texting himself / outreach echo
+  // Tier-1 referrer (e.g. Dad): the text is about a CUSTOMER. Parse the body for name/phone/vehicle;
+  // always surface it as a lead (flagged for review if nothing concrete parsed out).
+  const ref = referrers[senderPhone];
+  if (ref) {
+    const p = parseReferralLead(text);
+    // Only a lead if something concrete came out (name/phone/vehicle). Plain chatter ("call me")
+    // from the referrer is ignored, not turned into junk leads.
+    if (p.name || p.phone || p.vehicle) {
+      return { type: "lead", name: p.name, phone: p.phone, vehicle: p.vehicle, stock: null,
+               source: "Referral — " + ref.tag, referrer: ref.name, review: !p.name && !p.phone, text, hot: true };
+    }
+    return { type: "other", phone: senderPhone, text };
+  }
   const existing = customersByPhone[senderPhone];
   const vehMatch = (text.match(VEHICLE) || [])[0];
   const hasBuy = BUY.test(text);
@@ -71,6 +88,11 @@ try {
 } catch { contactQ = null; }
 const resolveName = (phone) => { if (!contactQ || !phone) return null; try { return contactQ.get(phone)?.name || null; } catch { return null; } };
 
+// Load Tier-1 referrers (data/referrers.json) — [{ name, tag, phones:[...] }]. Keyed by 10-digit phone.
+for (const r of read("referrers.json", [])) {
+  for (const p of (r.phones || [])) { const k = phone10(p); if (k) referrers[k] = { name: r.name, tag: r.tag || String(r.name || "").split(" ")[0] || "Referral" }; }
+}
+
 const leads = read("imessage-leads.json", []);
 const leadByKey = new Map(leads.map((l) => [l.phone || kebab(l.name), l]));
 const threads = read("imessage-threads.json", {});
@@ -86,13 +108,14 @@ for (const raw of inbox) {
   const c = classify(msg, byPhone);
   if (c.type === "spam") nSpam++;
   if (c.type === "lead") {
-    const lk = c.phone || kebab(c.name);
+    const lk = c.phone || kebab(c.name) || (c.referrer ? "ref-" + crypto.createHash("sha1").update(c.text || "").digest("hex").slice(0, 10) : "");
     const existing = leadByKey.get(lk);
     const entry = {
       slug: existing?.slug || "imsg-" + (lk || crypto.randomBytes(3).toString("hex")),
-      name: c.name || existing?.name || resolveName(c.phone) || "Texter " + (c.phone ? c.phone.slice(-4) : ""),
+      name: c.name || existing?.name || resolveName(c.phone) || (c.referrer ? `Lead via ${String(c.referrer).split(" ")[0] || "referral"}` : "Texter " + (c.phone ? c.phone.slice(-4) : "")),
       phone: c.phone || null, vehicle: c.vehicle || existing?.vehicle || "", source: c.source || "iMessage",
       stock: c.stock || existing?.stock || null, at: msg.date, lastMsg: c.text.slice(0, 160), hot: true, channel: "iMessage",
+      ...(c.referrer ? { referrer: c.referrer } : {}), ...(c.review ? { review: true } : {}),
     };
     leadByKey.set(lk, entry);
     (threads[entry.slug] ||= []).push({ at: msg.date, text: c.text, dir: "in" });

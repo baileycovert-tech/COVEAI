@@ -125,6 +125,44 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
   const signals = readJSON<any[]>("signals.json", []);
   const sendLog = readJSON<any[]>("send-log.json", []);
 
+  // iMessage tail health — is the Mac actually RECEIVING texts? The tail writes imessage-health.json
+  // every run, so newestMessageAt going stale while the tail keeps running = Messages on the Mac has
+  // stopped syncing (not a COVE bug); chatDbReadable=false = the tail lost Full Disk Access.
+  const im = readJSON<any>("imessage-health.json", null);
+  const imMt = statMs("imessage-health.json");
+  const imRow: HealthRow = (() => {
+    const base = {
+      key: "imessage-sync",
+      label: "Texts (iMessage on this Mac)",
+      upstream: "Messages on this Mac → chat.db → tail (com.covert.crm-imessage)",
+      refresh: "Autonomous tail reads chat.db every 2 min",
+      file: "imessage-health.json",
+      asOf: im?.newestMessageAt || null,
+    };
+    if (!im || imMt == null) {
+      return { ...base, status: "unavailable", lastWritten: fmtLocal(imMt), ageLabel: "—", detail: "no heartbeat — is com.covert.crm-imessage loaded?" };
+    }
+    const newestMs = im.newestMessageAt ? Date.parse(im.newestMessageAt) : NaN;
+    const newestAge = Number.isNaN(newestMs) ? null : now - newestMs;
+    const ranMs = im.ranAt ? Date.parse(im.ranAt) : NaN;
+    const ranAge = Number.isNaN(ranMs) ? null : now - ranMs;
+    const tailDown = ranAge == null || ranAge > 12 * 60000;
+    let status: SourceStatus;
+    let detail: string;
+    if (im.chatDbReadable === false) {
+      status = "unavailable";
+      detail = "chat.db not readable — grant Full Disk Access to node, or Messages stays unsynced";
+    } else if (tailDown) {
+      status = "old";
+      detail = `tail not running (last ran ${ageLabel(ranAge)}) — check com.covert.crm-imessage`;
+    } else {
+      status = statusFor(newestAge, 180, 720); // green <3h, amber 3–12h, red >12h since the last text
+      detail = `newest text ${ageLabel(newestAge)} · tail ran ${ageLabel(ranAge)}` +
+        (status !== "live" ? " — if you're getting texts, Messages on this Mac has stopped syncing (quit/reopen Messages; check Text Message Forwarding)" : "");
+    }
+    return { ...base, status, lastWritten: fmtLocal(imMt), ageLabel: ageLabel(ranAge), detail };
+  })();
+
   const rows: HealthRow[] = [
     row(
       "sold-deals",
@@ -187,6 +225,7 @@ export function getDataHealth(): { rows: HealthRow[]; now: string } {
         signals[0]?.at ? ` · newest ${signals[0].at}` : ""
       }`
     ),
+    imRow,
     row(
       "leads",
       "Lead feed (per-rep new leads)",
