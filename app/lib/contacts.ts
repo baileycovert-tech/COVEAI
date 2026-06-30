@@ -83,11 +83,11 @@ export function searchContacts(q: string, limit = 30): ContactHit[] {
   });
 }
 
-export type Buyer = { name: string; vehicle: string; soldAt: string; purchases: number; phone: string; email: string };
+export type Buyer = { name: string; vehicle: string; soldAt: string; purchases: number; rep: string; mine: boolean; phone: string; email: string };
 
-// Past buyers (people Bailey has sold) with context — vehicle + sold date — for the Contacts
-// rolodex. Source is data/_buyers.json (built by dms-refresh from the full CRM sold history);
-// each is enriched with the best phone/email we have (your manual corrections win).
+// Past buyers with context — vehicle + sold date + selling rep — for the Contacts rolodex.
+// Store-wide: your full book (mine=true) merged with the recent floor. Source is data/_buyers.json
+// (built by dms-refresh); each is enriched with the best phone/email we have (your corrections win).
 export function getBuyers(): Buyer[] {
   let raw: any[] = [];
   try { raw = JSON.parse(fs.readFileSync(path.join(process.cwd(), "data", "_buyers.json"), "utf8")); }
@@ -96,7 +96,8 @@ export function getBuyers(): Buyer[] {
     const hit = lookupContact(b.name, null);
     return {
       name: b.name, vehicle: b.vehicle || "", soldAt: b.soldAt || "",
-      purchases: b.purchases || 1, phone: hit?.phone || "", email: hit?.email || "",
+      purchases: b.purchases || 1, rep: b.rep || "", mine: !!b.mine,
+      phone: hit?.phone || "", email: hit?.email || "",
     };
   });
 }

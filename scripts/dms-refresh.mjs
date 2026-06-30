@@ -153,36 +153,48 @@ async function main() {
     write("deals.json", JSON.stringify(monthDeals, null, 2));
     log("month deals (deals.json):", monthDeals.length);
 
-    // CAREER sold customers + RICH BUYER CONTEXT (vehicle + sold date) — full CRM history, no date
-    // limit. Two uses: (a) build-crm drops a lead that's actually someone Bailey already sold AT ANY
-    // TIME; (b) the Contacts page shows a browsable rolodex of past buyers with WHAT they bought and
-    // WHEN — not just names. We keep the vehicle + most-recent sold date and count repeat buys.
-    const career = await q(
-      `SELECT customer, year, make, model, sold_datetime::text AS sold_at
-       FROM scorecard_leads
+    // BUYER ROLODEX (store-wide, with context). Two queries merged so the rolodex has BOTH your full
+    // personal book AND the recent floor — scorecard_leads.sold_datetime is sparse for recent deals
+    // (sales_pace/S1 is the reliable count), so a date-windowed store query alone buries your own buyers.
+    //   (a) YOUR career buyers — full history, no date limit. Also the build-crm DROP LIST (names only).
+    //   (b) Store floor — everyone's buyers in the last 365 days (recent activity).
+    const buyerCols = `customer, sales_rep, year, make, model, sold_datetime::text AS sold_at`;
+    const mineRows = await q(
+      `SELECT ${buyerCols} FROM scorecard_leads
        WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0
          AND (lead_status_type = 'Sold' OR sold_datetime IS NOT NULL)
          AND customer IS NOT NULL AND customer <> ''`
     );
+    const storeRows = await q(
+      `SELECT ${buyerCols} FROM scorecard_leads
+       WHERE (lead_status_type = 'Sold' OR sold_datetime IS NOT NULL)
+         AND sold_datetime >= (NOW() - INTERVAL '365 days')
+         AND customer IS NOT NULL AND customer <> ''`
+    );
     const buyersMap = new Map(); // one card per customer; newest purchase wins, repeat buys counted
-    for (const r of career) {
+    const addBuyer = (r) => {
       const key = String(r.customer || "").trim().toLowerCase();
-      if (!key) continue;
+      if (!key) return;
       const veh = [r.year, r.make, r.model].filter(Boolean).join(" ").trim();
       const at = String(r.sold_at || "").slice(0, 10);
+      const rep = String(r.sales_rep || "").trim();
+      const isMine = /bailey/i.test(rep);
       const cur = buyersMap.get(key);
-      if (!cur) buyersMap.set(key, { name: String(r.customer).trim(), vehicle: veh, soldAt: at, purchases: 1 });
+      if (!cur) buyersMap.set(key, { name: String(r.customer).trim(), vehicle: veh, soldAt: at, rep, mine: isMine, purchases: 1 });
       else {
         cur.purchases += 1;
-        if (at && at > (cur.soldAt || "")) { cur.soldAt = at; if (veh) cur.vehicle = veh; }
+        cur.mine = cur.mine || isMine;
+        if (at && at > (cur.soldAt || "")) { cur.soldAt = at; if (veh) cur.vehicle = veh; if (rep) cur.rep = rep; }
         else if (!cur.vehicle && veh) cur.vehicle = veh;
       }
-    }
+    };
+    for (const r of mineRows) addBuyer(r);
+    for (const r of storeRows) addBuyer(r);
+    write("sold-names.json", JSON.stringify([...new Set(mineRows.map((r) => String(r.customer).trim()))])); // drop list: Bailey only
     const buyers = [...buyersMap.values()].sort((a, b) => (b.soldAt || "").localeCompare(a.soldAt || ""));
-    write("sold-names.json", JSON.stringify(buyers.map((b) => b.name))); // unchanged consumer (drop list)
     write("_buyers.json", JSON.stringify(buyers, null, 2));
     health.ok.buyers = buyers.length;
-    log("career buyers (w/ context):", buyers.length);
+    log("buyers w/ context:", buyers.length, "· yours:", buyers.filter((b) => b.mine).length);
   } catch (e) { health.errors.sold = e.message; log("sold ERR", e.message); }
 
   // ---- 3b. PER-REP BOARDS — EXACT current-month sold by S1 (sales_pace, not name-matched) → reps.json ----

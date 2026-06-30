@@ -4,7 +4,7 @@ import { Search, UserPlus, Phone, Mail, MessageSquare, X, Check, Pencil, BadgeCh
 
 type Hit = { name: string; phone: string; email: string; source: string };
 type Added = { name: string; phone: string | null; email: string | null; at: string };
-type Buyer = { name: string; vehicle: string; soldAt: string; purchases: number; phone: string; email: string };
+type Buyer = { name: string; vehicle: string; soldAt: string; purchases: number; rep: string; mine: boolean; phone: string; email: string };
 
 const digits = (s?: string | null) => (s || "").replace(/[^\d]/g, "");
 const nkey = (s: string) =>
@@ -35,6 +35,7 @@ export default function ContactsClient({
   initial, indexReady, buyers,
 }: { initial: Added[]; indexReady: boolean; buyers: Buyer[] }) {
   const [tab, setTab] = useState<"buyers" | "all" | "added">("buyers");
+  const [scope, setScope] = useState<"all" | "mine">("all"); // store-wide vs just your buyers
   const [added, setAdded] = useState<Added[]>(initial);
 
   // search (debounced, runs across all tabs)
@@ -187,38 +188,50 @@ export default function ContactsClient({
             <button className={"btn" + (tab === "added" ? " primary" : "")} onClick={() => setTab("added")}>Added by me <span className="muted">· {added.length}</span></button>
           </div>
 
-          {/* PAST BUYERS — the rolodex with context */}
-          {tab === "buyers" && (
-            <div className="card pad-lg">
-              <div className="card-title" style={{ marginBottom: 4 }}><span className="ico"><BadgeCheck /></span>People you’ve sold <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— {buyers.length}, newest first</span></div>
-              <div className="stat-sub" style={{ marginBottom: 10 }}>Your book of past buyers — what they bought and when. Tap to call, text, or email.</div>
-              {buyers.length === 0 ? (
-                <div className="empty" style={{ fontSize: 13 }}>No sold history loaded yet — it builds from the DMS on the next refresh.</div>
-              ) : (
-                <div style={{ maxHeight: "66vh", overflowY: "auto" }}>
-                  {buyers.map((b, i) => (
-                    <div className="row-item" key={i}>
-                      <div className="row-main">
-                        <div className="row-title">
-                          {b.name}
-                          {b.purchases > 1 && <span className="badge green" style={{ marginLeft: 6 }}>{b.purchases}× buyer</span>}
-                        </div>
-                        <div className="row-sub">
-                          <Car size={12} style={{ verticalAlign: "-2px", marginRight: 4, opacity: 0.7 }} />
-                          {b.vehicle || "vehicle n/a"}{b.soldAt ? <span className="muted"> · {fmtDate(b.soldAt)}</span> : null}
-                          {(b.phone || b.email) && <span className="muted"> · {b.phone || b.email}</span>}
-                        </div>
-                      </div>
-                      <div className="flex" style={{ gap: 8, alignItems: "center" }}>
-                        <Reach phone={b.phone} email={b.email} />
-                        <button className="btn sm ghost" onClick={() => prefill(b.name, b.phone, b.email)} title="Fix contact"><Pencil size={13} /></button>
-                      </div>
-                    </div>
-                  ))}
+          {/* PAST BUYERS — the store-wide rolodex with context */}
+          {tab === "buyers" && (() => {
+            const mineCount = buyers.filter((b) => b.mine).length;
+            const shown = scope === "mine" ? buyers.filter((b) => b.mine) : buyers;
+            return (
+              <div className="card pad-lg">
+                <div className="flex" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+                  <div className="card-title" style={{ margin: 0 }}><span className="ico"><BadgeCheck /></span>Past buyers <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— {shown.length}, newest first</span></div>
+                  <div className="flex" style={{ gap: 6 }}>
+                    <button className={"btn sm" + (scope === "all" ? " primary" : " ghost")} onClick={() => setScope("all")}>Whole store <span className="muted">· {buyers.length}</span></button>
+                    <button className={"btn sm" + (scope === "mine" ? " primary" : " ghost")} onClick={() => setScope("mine")}>Mine <span className="muted">· {mineCount}</span></button>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="stat-sub" style={{ marginBottom: 10 }}>Everyone the store has sold (last 2 yrs) plus your full book — what they bought, when, and who sold them. Tap to call, text, or email.</div>
+                {shown.length === 0 ? (
+                  <div className="empty" style={{ fontSize: 13 }}>No sold history loaded yet — it builds from the DMS on the next refresh.</div>
+                ) : (
+                  <div style={{ maxHeight: "66vh", overflowY: "auto" }}>
+                    {shown.map((b, i) => (
+                      <div className="row-item" key={i}>
+                        <div className="row-main">
+                          <div className="row-title">
+                            {b.name}
+                            {b.mine && <span className="badge green" style={{ marginLeft: 6 }}>You</span>}
+                            {b.purchases > 1 && <span className="badge green" style={{ marginLeft: 6 }}>{b.purchases}× buyer</span>}
+                          </div>
+                          <div className="row-sub">
+                            <Car size={12} style={{ verticalAlign: "-2px", marginRight: 4, opacity: 0.7 }} />
+                            {b.vehicle || "vehicle n/a"}{b.soldAt ? <span className="muted"> · {fmtDate(b.soldAt)}</span> : null}
+                            {!b.mine && b.rep ? <span className="muted"> · sold by {b.rep}</span> : null}
+                            {(b.phone || b.email) && <span className="muted"> · {b.phone || b.email}</span>}
+                          </div>
+                        </div>
+                        <div className="flex" style={{ gap: 8, alignItems: "center" }}>
+                          <Reach phone={b.phone} email={b.email} />
+                          <button className="btn sm ghost" onClick={() => prefill(b.name, b.phone, b.email)} title="Fix contact"><Pencil size={13} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ALL CONTACTS — A–Z browse */}
           {tab === "all" && (
