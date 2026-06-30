@@ -8,11 +8,12 @@ import { Handshake, Car, MessageSquare } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default function CustomerDetail({ params }: { params: { slug: string } }) {
-  if (!currentUser()?.isAdmin) redirect("/");
+  const me = currentUser();
+  if (!me?.isAdmin) redirect("/");
   const c = getCustomers().find((x) => x.slug === params.slug);
   if (!c) return notFound();
   const matches = matchInventory(c.vehicle_interest);
-  const thread = getThreadForCustomer(c);
+  const thread = getThreadForCustomer(c, me.slug);
 
   return (
     <>
@@ -81,14 +82,21 @@ export default function CustomerDetail({ params }: { params: { slug: string } })
 
       {thread.length > 0 && (
         <div className="card pad-lg section-gap">
-          <div className="card-title" style={{ marginBottom: 12 }}><span className="ico"><MessageSquare /></span>Message log <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— {thread.length} from iMessage</span></div>
+          <div className="card-title" style={{ marginBottom: 12 }}><span className="ico"><MessageSquare /></span>Conversation <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— {thread.length} message{thread.length === 1 ? "" : "s"} (texts, emails &amp; COVE outreach)</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {thread.map((m, i) => (
-              <div key={i} className={"ask-msg " + (m.dir === "out" ? "you" : "bot")} style={{ maxWidth: "80%", alignSelf: m.dir === "out" ? "flex-end" : "flex-start" }}>
+              <div key={i} className={"ask-msg " + (m.dir === "out" ? "you" : "bot")} style={{ maxWidth: "80%", alignSelf: m.dir === "out" ? "flex-end" : "flex-start", opacity: (m as any).pending ? 0.7 : 1, border: (m as any).pending ? "1px dashed var(--border-strong)" : undefined }}>
                 <div>{m.text}</div>
-                <div className="ask-src">{(m.at || "").replace("T", " ").slice(0, 16)}</div>
+                <div className="ask-src">
+                  {(m as any).pending ? "✎ Draft — not sent yet · " : ""}
+                  {(m as any).channel ? `${(m as any).channel} · ` : ""}
+                  {(m.at || "").replace("T", " ").slice(0, 16)}
+                </div>
               </div>
             ))}
+          </div>
+          <div className="flex gap-sm" style={{ marginTop: 12 }}>
+            <Link className="btn primary sm" href={`/outreach?slug=${c.slug}`}><MessageSquare size={14} /> Draft / send a message</Link>
           </div>
         </div>
       )}

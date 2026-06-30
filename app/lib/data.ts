@@ -93,13 +93,25 @@ export const getThread = (slug: string) => {
 };
 // A text-lead's thread may be keyed by its imsg-slug even after it merges into an
 // existing customer record — match by slug, name, OR phone so it always links.
-export const getThreadForCustomer = (c: { slug: string; name?: string; phone?: string | null }) => {
+export const getThreadForCustomer = (
+  c: { slug: string; name?: string; phone?: string | null },
+  repSlug?: string
+): (ThreadMsg & { pending?: boolean; channel?: string })[] => {
   const all = read<Record<string, ThreadMsg[]>>("imessage-threads.json", {});
   const kb = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const p10 = (s: string) => (String(s || "").match(/\d/g) || []).join("").slice(-10);
   const keys = [c.slug, "imsg-" + kb(c.name || ""), c.phone ? "imsg-" + p10(c.phone) : ""].filter(Boolean);
-  for (const k of keys) if (all[k]?.length) return all[k];
-  return [] as ThreadMsg[];
+  let msgs: (ThreadMsg & { pending?: boolean; channel?: string })[] = [];
+  for (const k of keys) if (all[k]?.length) { msgs = [...all[k]]; break; }
+  // Merge in COVE outreach for this customer: SENT = real outbound; draft/approved = "ready, not sent".
+  const nm = kb(c.name || "");
+  for (const d of getOutreachQueue()) {
+    if (repSlug && (d.rep || "bailey-covert") !== repSlug) continue; // only this rep's outreach
+    if (d.slug !== c.slug && kb(d.customer) !== nm) continue;
+    if (d.status === "sent") msgs.push({ at: (d as any).sentAt || d.createdAt, text: d.body, dir: "out", channel: d.channel });
+    else if (d.status === "draft" || d.status === "approved") msgs.push({ at: d.createdAt, text: d.body, dir: "out", channel: d.channel, pending: true });
+  }
+  return msgs.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
 };
 
 // Morning-brief signals: the latest INBOUND message per thread, recent first. A thread is
