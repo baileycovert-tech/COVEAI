@@ -325,6 +325,20 @@ async function main() {
     health.ok.build = out.trim();
   } catch (e) { health.errors.build = e.message; log("build ERR", e.message); }
 
+  // ---- 5. AUTO-OUTREACH — draft the first touch for any brand-new lead (per rep, in their voice,
+  // with inventory match) and push their phone. Calls COVE's own endpoint so it reuses the drafting
+  // guardrails + per-rep queue. Drafts only — nothing is auto-SENT; the rep taps Send. ----
+  try {
+    const secret = process.env.CRM_SESSION_SECRET || fs.readFileSync(path.join(DATA, ".session-secret"), "utf8").trim();
+    const port = process.env.PORT || "4317";
+    const r = await fetch(`http://localhost:${port}/api/outreach/auto`, {
+      method: "POST", headers: { "x-cove-cron": secret, "content-type": "application/json" },
+    });
+    const j = await r.json().catch(() => ({}));
+    health.ok.autoDraft = j && j.ok ? `drafted ${j.drafted}` : `http ${r.status}`;
+    log("auto-outreach:", JSON.stringify(j));
+  } catch (e) { health.errors.autoDraft = e.message; log("auto-outreach ERR", e.message); }
+
   write("_refresh-log.json", JSON.stringify({ ...health, finishedAt: new Date().toISOString() }, null, 2));
   log("done", JSON.stringify(health.ok));
   process.exit(0);

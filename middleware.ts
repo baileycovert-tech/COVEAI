@@ -45,6 +45,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/_next") || pathname.startsWith("/icon") ||
     pathname === "/apple-touch-icon.png" || pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
+    // Internal cron endpoint — no session cookie; it authenticates itself with the x-cove-cron secret.
+    pathname === "/api/outreach/auto" ||
     PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))
   ) {
     return NextResponse.next();

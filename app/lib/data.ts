@@ -46,7 +46,14 @@ export type OutreachDraft = {
   id: string; customer: string; slug: string; channel: "text" | "email";
   subject?: string; body: string; status: "draft" | "approved" | "sent" | "dismissed";
   createdAt: string; rationale?: string; generatedBy: "ai" | "template";
+  rep?: string;   // owner slug — a draft belongs to ONE rep; queues never cross reps
+  to?: string;    // resolved recipient (phone or email) at draft time
+  auto?: boolean; // true if COVE auto-generated it when the lead landed
 };
+
+// A draft belongs to the rep who owns it; legacy drafts (no rep) were all Bailey's.
+export const outreachQueueFor = (slug: string) =>
+  getOutreachQueue().filter((d) => (d.rep || "bailey-covert") === slug);
 
 // ---------- Loaders ----------
 export const getProfile = () => read("profile.json", {} as any);
@@ -208,7 +215,7 @@ export type Viewer = { slug: string; isAdmin: boolean; manager?: boolean } | nul
 const isBaileyV = (me: Viewer) => me?.slug === "bailey-covert";
 const seesFloor = (me: Viewer) => !!(me && (me.manager || (me.isAdmin && !isBaileyV(me))));
 
-function leadFeedAsCustomers(slug: string): Customer[] {
+export function leadFeedAsCustomers(slug: string): Customer[] {
   return getLeadFeed(slug).map((l, i) => ({
     slug: "lead-" + i + "-" + (l.customer || "x").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     name: l.customer || "Lead", phone: null, email: null,

@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
   const queue = getOutreachQueue();
   const draft = queue.find((d) => d.id === id);
   if (!draft) return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+  // A rep may only send their OWN drafts (legacy drafts with no rep were Bailey's).
+  if ((draft.rep || "bailey-covert") !== me.slug) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
 
   // Guardrail: only approved drafts may be sent. Forces the review step first.
   if (draft.status !== "approved") {

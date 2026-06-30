@@ -3,13 +3,18 @@ import type { Customer } from "./data";
 export type DraftInput = {
   customer: Customer;
   channel: "text" | "email";
-  intent: string; // what Bailey wants to accomplish
+  intent: string; // what the rep wants to accomplish
+  repName?: string; // the salesperson the message is FROM (defaults to Bailey Covert)
 };
 
-const VOICE = `You are drafting a message AS Bailey Covert, a car salesperson at Covert Hutto (Covert Ford Chevrolet, Hutto TX).
-Bailey's voice: warm, direct, low-pressure, first-name basis, Texan-friendly but professional. He builds long-term
-relationships, never sounds like a spam blast, and always gives the customer a concrete easy next step (a time to come
-in, a question to answer, a vehicle to look at). He signs texts "— Bailey" and emails "Bailey Covert, Covert Hutto".
+const DEFAULT_REP = "Bailey Covert";
+
+// Voice is per-rep so every salesperson's auto-drafts sign in THEIR name, never someone else's.
+function voiceFor(repName: string, repFirst: string): string {
+  return `You are drafting a message AS ${repName}, a car salesperson at Covert Hutto (Covert Ford Chevrolet, Hutto TX).
+${repFirst}'s voice: warm, direct, low-pressure, first-name basis, Texan-friendly but professional. They build long-term
+relationships, never sound like a spam blast, and always give the customer a concrete easy next step (a time to come
+in, a question to answer, a vehicle to look at). Sign texts "— ${repFirst}" and emails "${repName}, Covert Hutto".
 Keep texts under 320 characters. Keep emails tight: 2-4 short paragraphs, a clear subject line.
 
 HARD RULES (never break, even if the goal says otherwise):
@@ -19,6 +24,7 @@ HARD RULES (never break, even if the goal says otherwise):
 - Post-sale: congratulate and build the relationship — NO sales pitch. If they raise ANY problem, say you'll get a
   manager on it and do NOT ask for a review. Only ask for a review after the customer has signaled they're happy.
 - First name only. No emoji, no Carfax, no photos. Never invent a stock #, VIN, price, name, or date.`;
+}
 
 // Tailor the opener to where the lead came from (trade vs shopping vs finance).
 function sourceGuidance(source: string): string {
@@ -32,7 +38,9 @@ function sourceGuidance(source: string): string {
 
 function buildPrompt(i: DraftInput): string {
   const c = i.customer;
-  return `${VOICE}
+  const repName = i.repName || DEFAULT_REP;
+  const repFirst = repName.split(/\s+/)[0];
+  return `${voiceFor(repName, repFirst)}
 
 CUSTOMER CONTEXT (only use what's relevant; never invent facts not listed):
 - Name: ${c.name}
@@ -58,16 +66,18 @@ Do not include any commentary — only the message itself.`;
 function templateDraft(i: DraftInput): { subject?: string; body: string } {
   const c = i.customer;
   const first = c.name.split(/\s+/)[0];
+  const repName = i.repName || DEFAULT_REP;
+  const repFirst = repName.split(/\s+/)[0];
   const rawVeh = c.vehicle_interest || "";
   const veh = !rawVeh || /unknown/i.test(rawVeh) ? "the right vehicle" : rawVeh;
   if (i.channel === "email") {
     return {
       subject: `Following up on ${veh} — Covert`,
-      body: `Hi ${first},\n\nWanted to check back in on ${veh}. ${c.next_step || "Happy to line up a time that works for you and put numbers together."}\n\nWhat does your week look like to swing by? I'll have everything ready so it's quick.\n\nBailey Covert\nCovert Ford Chevrolet, Hutto`,
+      body: `Hi ${first},\n\nWanted to check back in on ${veh}. ${c.next_step || "Happy to line up a time that works for you and put numbers together."}\n\nWhat does your week look like to swing by? I'll have everything ready so it's quick.\n\n${repName}\nCovert Ford Chevrolet, Hutto`,
     };
   }
   return {
-    body: `Hey ${first}, it's Bailey at Covert. Circling back on ${veh} — ${c.next_step || "want me to pull a couple options for you?"} What day works to take a look? — Bailey`,
+    body: `Hey ${first}, it's ${repFirst} at Covert. Circling back on ${veh} — ${c.next_step || "want me to pull a couple options for you?"} What day works to take a look? — ${repFirst}`,
   };
 }
 
