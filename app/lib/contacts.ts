@@ -59,10 +59,13 @@ export function searchContacts(q: string, limit = 30): ContactHit[] {
     } else {
       const terms = ql.replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 1);
       if (!terms.length) return [];
-      const where = terms.map(() => "LOWER(name) LIKE ?").join(" AND ");
-      const args = terms.map((t) => `%${t}%`);
-      // No phone/email filter — every match is findable (incl. the ~23k email-only contacts);
-      // contacts that have a phone are listed first.
+      // Each term may match the NAME or the EMAIL, so a remembered email handle typed
+      // without the "@" (e.g. "drits175") still finds the contact. Combined with the phone
+      // and "@"-email branches above, every contact is findable by name, email, or full phone
+      // (incl. the ~23k email-only contacts); contacts that have a phone are listed first.
+      const where = terms.map(() => "(LOWER(name) LIKE ? OR LOWER(email) LIKE ?)").join(" AND ");
+      const args: string[] = [];
+      for (const t of terms) { const w = `%${t}%`; args.push(w, w); }
       rows = db.prepare(
         `SELECT name,phone,email,source FROM contacts WHERE ${where} ORDER BY (phone10!='') DESC, (email!='') DESC LIMIT ?`
       ).all(...args, limit) as ContactHit[];
