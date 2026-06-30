@@ -3,7 +3,23 @@ import { getInventoryUnits, getDeals, getCustomers, getPipeline, getReps, getOut
 import { dmsQuery } from "../../lib/dms";
 import { draftMessage } from "../../lib/anthropic";
 import { lookupContact } from "../../lib/contacts";
-import { currentUser } from "../../lib/auth";
+import { currentUser, getUserBySlug } from "../../lib/auth";
+
+// Per-viewer DMS identity so the chat answers about THE SIGNED-IN REP's data only — never another
+// rep's. first+last match (case-insensitive) avoids collisions (Josh Fowler vs Patrick/Ryan Fowler;
+// Bailey Covert / "Bailey Covert CH" vs Bailey Hendrick).
+type RepId = { name: string; first: string; last: string; s1s: string[]; repClause: (col?: string) => string };
+function repIdentity(me: Viewer): RepId {
+  const u = me ? getUserBySlug(me.slug) : null;
+  const name = (u?.name || "the rep").trim();
+  const toks = name.split(/\s+/).filter(Boolean);
+  const first = (toks[0] || name).replace(/'/g, "''");
+  const last = (toks[toks.length - 1] || name).replace(/'/g, "''");
+  const s1s = [u?.chevyS1, u?.fordS1].filter(Boolean).map(String);
+  const repClause = (col = "sales_rep") =>
+    `POSITION(UPPER('${first}') IN UPPER(COALESCE(${col},''))) > 0 AND POSITION(UPPER('${last}') IN UPPER(COALESCE(${col},''))) > 0`;
+  return { name, first, last, s1s, repClause };
+}
 
 // Reps get the full assistant — their numbers, inventory, leads, drafting. The ONLY thing
 // held back from a non-manager login is the lot's aggregate inventory value/worth (and unit
@@ -37,17 +53,23 @@ function crmSnapshot(me: Viewer) {
   return `Pipeline (${p.standing || ""}) — ${cols}. Needs-first-contact: ${hot || "none"}. Board month: ${reps.month || ""}.`;
 }
 
-const SYSTEM = `You are COVE, Bailey Covert's AI sales assistant, embedded in his COVE app. Talk like a sharp, concise desk manager — direct, useful, no fluff. If asked your name, you're COVE.
+function buildSystem(id: RepId, floorChat: boolean): string {
+  const scope = floorChat
+    ? `SCOPE: this is a MANAGER/OWNER login — you may query the whole sales floor (any rep, store-wide).`
+    : `STRICT SCOPE — you serve ${id.name} ONLY. Every time you query a rep-attributed table (scorecard_leads, scorecard_sales, sales_pace, fi_deals, scorecard_appointments, scorecard_tasks) you MUST filter to ${id.name}: use "${id.repClause("sales_rep")}" on scorecard_leads (sales_representative on scorecard_sales), and "S1-NUMBER" IN (${id.s1s.map((s) => `'${s}'`).join(", ") || "''"}) on sales_pace. NEVER return another salesperson's leads, customers, pace, or deals — even if asked directly. If asked about another rep or the whole store, say that isn't available on their login. (Inventory and service are shared — no rep filter needed for those.)`;
+  return `You are COVE, ${id.name}'s AI sales assistant, embedded in their COVE app. Talk like a sharp, concise desk manager — direct, useful, no fluff. If asked your name, you're COVE.
 
 FORMAT FOR A NARROW PHONE CHAT PANEL: short bullet lists, not wide markdown tables. Keep lines short. Lead with the answer.
 
-WHO: Bailey Covert, salesman at Covert Ford Chevrolet Hutto. Cell 512-777-9404. S1 numbers: Chevy 1249, Ford 3001249. His DMS rep name matches POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0.
+WHO: ${id.name}, salesperson at Covert Ford Chevrolet Hutto. Their S1 numbers: ${id.s1s.join(", ") || "n/a"}. Their DMS rep name matches ${id.repClause("sales_rep")}.
 
-YOU HAVE LIVE DATA. Use the query_dms tool to answer ANYTHING about deals, leads, inventory, F&I, sales pace, service, employees — it runs read-only SQL on the same dealership DMS the desktop assistant uses.
+${scope}
+
+YOU HAVE LIVE DATA via the query_dms tool — read-only SQL on the dealership DMS.
 
 DMS RULES (critical):
 - Postgres. NEVER use ILIKE or the % wildcard — it throws "tuple index out of range" on NaN columns. Use POSITION('x' IN COALESCE(col,'')) > 0 for text matching.
-- run_query is SELECT-only. ALWAYS add LIMIT (<= 50).
+- query_dms is SELECT-only. ALWAYS add LIMIT (<= 50).
 - Key tables/columns:
   • scorecard_leads — CRM leads: customer, sales_rep, lead_status, lead_status_type ('Active'/'Sold'/'Bad'/'Lost'), contacted_indicator, year, make, model, trim, stock_number, vin, lead_source, lead_origination_date, last_customer_contact, sold_datetime
   • scorecard_sales — sold deals: customer, sales_representative, sold_date, stock_number, inventory_type, total_gross
@@ -57,12 +79,13 @@ DMS RULES (critical):
 - "Open leads" filter: lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market').
 - For quick inventory lookups you may use search_inventory (local snapshot of new + used units, all makes) instead of SQL.
 
-DRAFTING TEXTS (when asked to write/draft a customer message) — LOCKED VOICE:
-"Hey [FirstName] — Bailey Covert at Covert Hutto, your guy on the [Year] [Make] [Model] [Trim]. Reaching out direct from my cell. What time can you make it out today?"
-First name only. NO price, NO Carfax, NO photos, NO emoji. Always end with an appointment ask. Adapt naturally but keep that backbone.
+DRAFTING TEXTS (when asked to write/draft a customer message) — voice of ${id.name}:
+"Hey [FirstName] — ${id.first} at Covert Hutto, your guy on the [Year] [Make] [Model] [Trim]. Reaching out direct from my cell. What time can you make it out today?"
+First name only. NO price, NO Carfax, NO photos, NO emoji. Always end with an appointment ask. Sign as ${id.first}. Adapt naturally but keep that backbone.
 GUARDRAILS: Never quote a trade/appraisal/KBB figure, price, payment, or gross — bring them in to confirm in person (no figures in appointment confirms either). Reviving a stalled thread → ask ONE open question. Post-sale → congratulate, NO pitch; if they raise any problem, loop in a manager and do NOT ask for a review; only ask for a review after they've signaled they're happy. Tailor the opener to the lead source: trade/KBB-ICO → trade-in focus; finance (Capital One/Chase/700Credit) → low-key pre-approval; everything else → the vehicle they inquired on.
 
 NEVER fabricate a stock #, VIN, price, gross, name, or date. If you don't have it, query the DMS or say you don't know. Keep answers tight; use short lists. Money like $1,234.`;
+}
 
 const TOOLS = [
   {
@@ -82,11 +105,23 @@ const TOOLS = [
   },
 ];
 
-async function runTool(name: string, input: any, restricted = false, isAdmin = false): Promise<string> {
+async function runTool(name: string, input: any, opts: { restricted: boolean; isAdmin: boolean; floorChat: boolean; scope: RepId }): Promise<string> {
+  const { restricted, isAdmin, floorChat, scope } = opts;
   try {
     if (name === "query_dms") {
-      if (restricted && FINANCIAL_SQL.test(String(input.sql || ""))) return "REFUSED: " + RESTRICTED_MSG;
-      const rows = await dmsQuery(String(input.sql || ""));
+      const sql = String(input.sql || "");
+      if (restricted && FINANCIAL_SQL.test(sql)) return "REFUSED: " + RESTRICTED_MSG;
+      // Per-rep enforcement for non-floor logins: any query on rep-attributed tables MUST carry this
+      // rep's identity (their last name or an S1), so a salesperson can't pull the whole floor's leads.
+      if (!floorChat) {
+        const REP_TABLES = /scorecard_leads|scorecard_sales|sales_pace|fi_deals|scorecard_appointment|scorecard_task|scorecard_contact|scorecard_comm/i;
+        if (REP_TABLES.test(sql)) {
+          const U = sql.toUpperCase();
+          const hasRep = U.includes(scope.last.toUpperCase()) || scope.s1s.some((s) => sql.includes(s));
+          if (!hasRep) return `REFUSED: on your login, questions about leads/deals/pace must be scoped to ${scope.name} — add their name or S1 to the WHERE clause. Other reps' data isn't available.`;
+        }
+      }
+      const rows = await dmsQuery(sql);
       let out = JSON.stringify(rows);
       if (out.length > 9000) out = out.slice(0, 9000) + ` …(truncated; ${rows.length} rows — add a tighter LIMIT)`;
       return out;
@@ -111,6 +146,7 @@ async function runTool(name: string, input: any, restricted = false, isAdmin = f
 const OPEN = "lead_status NOT IN ('Delivered','Sold','Lost','Dead','Duplicate lead','Lead process completed','Out of market')";
 async function routedLookup(question: string, restricted = false, me: Viewer = null): Promise<string | null> {
   const ql = question.toLowerCase();
+  const id = repIdentity(me); // scope every DMS lookup to the signed-in rep
 
   // DRAFT a customer message — voice-locked template. (whole-word name match)
   if (/\b(draft|write|text|message|send|reach out to)\b/.test(ql)) {
@@ -131,7 +167,7 @@ async function routedLookup(question: string, restricted = false, me: Viewer = n
   try {
     // FOLLOW-UPS — open leads gone quiet.
     if (/\b(follow.?up|who.*(call|reach|contact|work)|need.*call|chase|stale|cold|left to)\b/.test(ql)) {
-      const rows = await dmsQuery(`SELECT customer, year, make, model, lead_status, COALESCE(last_customer_contact::text, lead_origination_date::text) AS last FROM scorecard_leads WHERE POSITION('Bailey' IN COALESCE(sales_rep,'')) > 0 AND lead_status IN ('Active Lead','New Lead','Waiting for prospect response') AND lead_origination_date >= (CURRENT_DATE - INTERVAL '60 days') AND (last_customer_contact IS NULL OR last_customer_contact < (NOW() - INTERVAL '3 days')) ORDER BY COALESCE(last_customer_contact, lead_origination_date) ASC LIMIT 12`);
+      const rows = await dmsQuery(`SELECT customer, year, make, model, lead_status, COALESCE(last_customer_contact::text, lead_origination_date::text) AS last FROM scorecard_leads WHERE ${id.repClause("sales_rep")} AND lead_status IN ('Active Lead','New Lead','Waiting for prospect response') AND lead_origination_date >= (CURRENT_DATE - INTERVAL '60 days') AND (last_customer_contact IS NULL OR last_customer_contact < (NOW() - INTERVAL '3 days')) ORDER BY COALESCE(last_customer_contact, lead_origination_date) ASC LIMIT 12`);
       const seen = new Set<string>();
       const uniq = rows.filter((r: any) => { const k = (r.customer || "").toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
       if (!uniq.length) return "No open leads have gone quiet — you're caught up.";
@@ -139,9 +175,9 @@ async function routedLookup(question: string, restricted = false, me: Viewer = n
     }
     // PACE / how am I doing this month.
     if (/\b(pace|this month|how.*doing|standing|mtd|my (units|gross|numbers|month)|where am i)\b/.test(ql)) {
-      if (restricted) return "Your month-to-date numbers are on your Sales Board. Store-wide and other-rep financials aren't available on your login.";
+      if (!id.s1s.length) return "I don't have your S1 numbers on file yet — your month-to-date pace shows on your Sales Board.";
       const first = new Date().toISOString().slice(0, 8) + "01";
-      const rows = await dmsQuery(`SELECT "NUO" AS nuo, COUNT(*) AS units, COALESCE(SUM("FRONT-GROSS"),0)::numeric(12,0) AS front, COALESCE(SUM("BACK-GROSS"),0)::numeric(12,0) AS back FROM sales_pace WHERE "S1-NUMBER" IN ('1249','3001249') AND "DATE" >= '${first}' GROUP BY "NUO"`);
+      const rows = await dmsQuery(`SELECT "NUO" AS nuo, COUNT(*) AS units, COALESCE(SUM("FRONT-GROSS"),0)::numeric(12,0) AS front, COALESCE(SUM("BACK-GROSS"),0)::numeric(12,0) AS back FROM sales_pace WHERE "S1-NUMBER" IN (${id.s1s.map((s) => `'${s}'`).join(",")}) AND "DATE" >= '${first}' GROUP BY "NUO"`);
       const u = rows.reduce((n: number, r: any) => n + Number(r.units || 0), 0);
       const g = rows.reduce((n: number, r: any) => n + Number(r.front || 0) + Number(r.back || 0), 0);
       const split = rows.map((r: any) => `${Number(r.units)} ${r.nuo}`).join(" / ");
@@ -174,6 +210,11 @@ export async function POST(req: NextRequest) {
   const me = currentUser();
   const restricted = !(me?.seesFinancials);
   const isAdmin = !!me?.isAdmin;
+  const isBailey = me?.slug === "bailey-covert";
+  // Floor chat = manager or owner-admin (not Bailey): may query store-wide. Everyone else (Bailey +
+  // plain reps) is locked to their OWN rep data, both in the prompt and enforced in the tool.
+  const floorChat = !!(me && (me.manager || (me.isAdmin && !isBailey)));
+  const id = repIdentity(me);
 
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
@@ -195,7 +236,7 @@ export async function POST(req: NextRequest) {
     const policy = restricted
       ? "\n\nACCESS LEVEL — SALESPERSON: full assistant. Help with inventory, their leads/customers, follow-ups, pace, their own sold numbers and gross, and message drafts. The ONLY thing you must NOT reveal is the lot's aggregate INVENTORY VALUE/WORTH or unit COST/margin. If asked for that, reply exactly: \"" + RESTRICTED_MSG + "\" Everything else is fine."
       : "";
-    const system = SYSTEM + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot(me);
+    const system = buildSystem(id, floorChat) + policy + "\n\nCURRENT CRM SNAPSHOT (already loaded — use without querying):\n" + crmSnapshot(me);
 
     // Agentic tool-use loop.
     for (let i = 0; i < 6; i++) {
@@ -207,7 +248,7 @@ export async function POST(req: NextRequest) {
       }
       messages.push({ role: "assistant", content: resp.content });
       const results = [];
-      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input, restricted, isAdmin) });
+      for (const tu of toolUses) results.push({ type: "tool_result", tool_use_id: tu.id, content: await runTool(tu.name, tu.input, { restricted, isAdmin, floorChat, scope: id }) });
       messages.push({ role: "user", content: results });
     }
     return NextResponse.json({ answer: "That took too many steps — try narrowing the question.", source: "ai" });
